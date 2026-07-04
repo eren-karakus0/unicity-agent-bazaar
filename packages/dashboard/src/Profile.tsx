@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type EscrowState, type JobSummary, type Listing, type ProfileView } from './lib/api';
 import { useAuth } from './lib/auth';
 import { HireDialog } from './HireDialog';
+import { SkeletonProfile } from './Skeletons';
 import { go } from './lib/nav';
 
 /** A stable hue from any principal string, for the generated avatar. */
@@ -98,7 +99,7 @@ export function Profile({ principal }: { principal: string | null }) {
       </div>
     );
   }
-  if (!profile) return <div className="empty">loading profile…</div>;
+  if (!profile) return <SkeletonProfile />;
 
   const isMe = !!session && profile.principal === (session.nametag ? `@${session.nametag}` : session.chainPubkey);
   const name = profile.nametag ? `@${profile.nametag}` : shortKey(profile.principal);

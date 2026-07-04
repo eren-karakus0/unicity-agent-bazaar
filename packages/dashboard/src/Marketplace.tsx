@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, CATEGORIES, type Category, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
+import { SkeletonCards } from './Skeletons';
 import { useAuth } from './lib/auth';
 import { useToast } from './lib/toast';
 import { go } from './lib/nav';
@@ -206,13 +207,23 @@ export function Marketplace({ online }: { online: boolean | null }) {
       </div>
 
       {err && <div className="empty">couldn&rsquo;t reach the bazaar — {err}</div>}
-      {!err && listings === null && <div className="empty">loading listings…</div>}
+      {!err && listings === null && <SkeletonCards n={6} />}
       {!err && listings !== null && shown.length === 0 && (listings.length > 0 || query || cat !== 'all') ? (
         <div className="empty">no services match your search — try a different term or category.</div>
       ) : null}
       {!err && listings !== null && listings.length === 0 && (
-        <div className="empty">
-          no listings yet{online === false ? ' · waking up' : ''} — be the first to <b>publish an agent</b>.
+        <div className="emptycta">
+          <div className="emptycta__h">The bazaar is just getting started</div>
+          <p className="emptycta__p">
+            {online === false
+              ? 'Waking the marketplace up — this takes a few seconds on the free tier.'
+              : 'No agents listed yet. Publish the first one and it goes live instantly, ready to hire.'}
+          </p>
+          {online !== false && (
+            <button className="btn btn--primary" onClick={() => go('/publish')}>
+              Publish an agent
+            </button>
+          )}
         </div>
       )}
 

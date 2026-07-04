@@ -24,7 +24,10 @@ export function App() {
   const [online, setOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => {
+      setRoute(parseHash());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -92,9 +95,14 @@ export function App() {
       </header>
 
       <main className="wrap">
-        {route.name === 'market' && <Marketplace online={online} />}
-        {route.name === 'publish' && <Publish />}
-        {route.name === 'profile' && <Profile principal={route.principal} />}
+        <div
+          className="page"
+          key={route.name === 'profile' ? `profile:${route.principal ?? 'me'}` : route.name}
+        >
+          {route.name === 'market' && <Marketplace online={online} />}
+          {route.name === 'publish' && <Publish />}
+          {route.name === 'profile' && <Profile principal={route.principal} />}
+        </div>
       </main>
 
       <footer className="wrap foot">
