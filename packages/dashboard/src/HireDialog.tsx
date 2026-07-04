@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type EscrowState, type HireResult, type JobView, type Listing, type Review } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
+import { useToast } from './lib/toast';
 
 const STEPS: { key: EscrowState; label: string }[] = [
   { key: 'quoted', label: 'quoted' },
@@ -278,8 +279,15 @@ function pretty(x: unknown): string {
   }
 }
 function CopyBtn({ v }: { v: string }) {
+  const toast = useToast();
   return (
-    <button className="copy" onClick={() => navigator.clipboard?.writeText(v)}>
+    <button
+      className="copy"
+      onClick={() => {
+        void navigator.clipboard?.writeText(v);
+        toast('Copied to clipboard', 'info');
+      }}
+    >
       copy
     </button>
   );

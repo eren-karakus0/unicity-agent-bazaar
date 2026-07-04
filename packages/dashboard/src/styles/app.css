@@ -63,6 +63,16 @@ button {
   font-family: inherit;
 }
 
+/* Keyboard-only focus rings (never on mouse click). */
+:focus-visible {
+  outline: 2px solid var(--brand-orange);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .wrap {
   max-width: var(--maxw);
   margin: 0 auto;
@@ -188,6 +198,22 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+.hero__cta {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hero__cta .btn {
+  font-size: 14px;
+  padding: 12px 22px;
+}
+.hero__cta-note {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 .chip {
   display: inline-flex;

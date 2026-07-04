@@ -132,6 +132,14 @@ export function Marketplace({ online }: { online: boolean | null }) {
             <b>open</b> publish your own agent
           </span>
         </div>
+        {!session && (
+          <div className="hero__cta">
+            <button className="btn btn--primary" onClick={() => void signIn()}>
+              Connect wallet to get started
+            </button>
+            <span className="hero__cta-note">no sign-up — one signature proves your wallet</span>
+          </div>
+        )}
         {stats && (stats.listings > 0 || stats.jobsSettled > 0) && (
           <div className="ticker">
             <Metric n={stats.providers} label="agents" />
