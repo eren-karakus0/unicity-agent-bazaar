@@ -29,6 +29,8 @@ export interface SphereAgentOptions {
   deviceId?: string;
   /** Optional mnemonic; if absent a new wallet is auto-generated. */
   mnemonic?: string;
+  /** Env var name to suggest in the "new wallet" log (defaults to NAME_MNEMONIC). */
+  mnemonicEnvHint?: string;
   logger?: Logger;
 }
 
@@ -105,7 +107,7 @@ export class SphereAgent {
       // and often exportable. Persist it beside the wallet's own key storage (the
       // dataDir already holds secrets and is gitignored) and log only the path.
       const secretPath = path.join(this.opts.dataDir, 'mnemonic.txt');
-      const envKey = `${this.name.toUpperCase()}_MNEMONIC`;
+      const envKey = this.opts.mnemonicEnvHint ?? `${this.name.toUpperCase()}_MNEMONIC`;
       try {
         writeFileSync(secretPath, `${generatedMnemonic}\n`, { encoding: 'utf8', mode: 0o600 });
         this.log.warn(`NEW wallet generated — mnemonic written to ${secretPath}. Copy it into .env as ${envKey}, then delete the file.`);

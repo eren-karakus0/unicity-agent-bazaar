@@ -32,6 +32,7 @@ const escrowAgent = new SphereAgent({
   oracleApiKey: env.oracleApiKey,
   walletApiUrl: env.walletApiUrl,
   mnemonic: env.escrow.mnemonic,
+  mnemonicEnvHint: 'BAZAAR_ESCROW_MNEMONIC',
   deviceId: 'bazaar-escrow',
   logger: createLogger('escrow'),
 });
