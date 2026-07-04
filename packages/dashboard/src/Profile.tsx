@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type EscrowState, type JobSummary, type Listing, type ProfileView } from './lib/api';
 import { useAuth } from './lib/auth';
 import { HireDialog } from './HireDialog';
+import { go } from './lib/nav';
 
 /** A stable hue from any principal string, for the generated avatar. */
 function hueOf(s: string): number {
@@ -56,6 +57,7 @@ const STATE_TONE: Record<EscrowState, string> = {
 export function Profile({ principal }: { principal: string | null }) {
   const { session } = useAuth();
   const [profile, setProfile] = useState<ProfileView | null>(null);
+  const [favorites, setFavorites] = useState<Listing[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [hiring, setHiring] = useState<Listing | null>(null);
 
@@ -70,6 +72,18 @@ export function Profile({ principal }: { principal: string | null }) {
     setProfile(null);
     load();
   }, [load]);
+
+  // Favorites are private — only shown on your own (`#/profile`) view.
+  useEffect(() => {
+    if (target !== null || !session) {
+      setFavorites(null);
+      return;
+    }
+    api
+      .myFavorites()
+      .then((f) => setFavorites(f.listings))
+      .catch(() => setFavorites([]));
+  }, [target, session]);
 
   if (target === null && !session) {
     return <div className="empty">Connect your wallet to see your profile.</div>;
@@ -150,26 +164,21 @@ export function Profile({ principal }: { principal: string | null }) {
           </div>
           <div className="grid">
             {profile.listings.map((l, i) => (
-              <article className="card" key={l.id} style={{ animationDelay: `${i * 0.04}s` }}>
-                <div className="card__top">
-                  <span className="tag">{l.category}</span>
-                  <span className="card__rep">{l.priceUct} UCT</span>
-                </div>
-                <div>
-                  <div className="card__title">{l.title}</div>
-                  <div className="card__agent">{l.agentNametag}</div>
-                </div>
-                <p className="card__desc">{l.description}</p>
-                <div className="card__foot">
-                  <span className="price">
-                    {l.priceUct}
-                    <em>UCT</em>
-                  </span>
-                  <button className="btn btn--primary btn--sm" onClick={() => setHiring(l)}>
-                    Hire &rarr;
-                  </button>
-                </div>
-              </article>
+              <ProfileListingCard key={l.id} listing={l} delay={i * 0.04} onHire={() => setHiring(l)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {target === null && favorites && favorites.length > 0 && (
+        <>
+          <div className="sec">
+            <span className="sec__t">★ Favorites</span>
+            <span className="sec__c">{favorites.length} saved</span>
+          </div>
+          <div className="grid">
+            {favorites.map((l, i) => (
+              <ProfileListingCard key={l.id} listing={l} delay={i * 0.04} onHire={() => setHiring(l)} />
             ))}
           </div>
         </>
@@ -206,6 +215,47 @@ export function Profile({ principal }: { principal: string | null }) {
 
       {hiring && <HireDialog listing={hiring} onClose={() => setHiring(null)} />}
     </>
+  );
+}
+
+function ProfileListingCard({
+  listing,
+  delay,
+  onHire,
+}: {
+  listing: Listing;
+  delay: number;
+  onHire: () => void;
+}) {
+  return (
+    <article className="card" style={{ animationDelay: `${delay}s` }}>
+      <div className="card__top">
+        <span className="tag">{listing.category}</span>
+        <span className="card__rep">
+          {listing.avgRating != null && <span className="card__star">★ {listing.avgRating.toFixed(1)}</span>}
+          {(listing.favorites ?? 0) > 0 ? `♥ ${listing.favorites}` : ''}
+        </span>
+      </div>
+      <div>
+        <div className="card__title">{listing.title}</div>
+        <button
+          className="card__agent card__agent--link"
+          onClick={() => go(`/agent/${encodeURIComponent(listing.agentNametag)}`)}
+        >
+          {listing.agentNametag}
+        </button>
+      </div>
+      <p className="card__desc">{listing.description}</p>
+      <div className="card__foot">
+        <span className="price">
+          {listing.priceUct}
+          <em>UCT</em>
+        </span>
+        <button className="btn btn--primary btn--sm" onClick={onHire}>
+          Hire &rarr;
+        </button>
+      </div>
+    </article>
   );
 }
 

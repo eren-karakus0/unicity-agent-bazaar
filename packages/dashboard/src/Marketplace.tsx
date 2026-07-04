@@ -5,6 +5,24 @@ import { useAuth } from './lib/auth';
 import { useToast } from './lib/toast';
 import { go } from './lib/nav';
 
+type SortKey = 'newest' | 'trending' | 'rating' | 'price-asc' | 'price-desc';
+
+const SORT_LABELS: Record<SortKey, string> = {
+  newest: 'newest',
+  trending: 'trending',
+  rating: 'top rated',
+  'price-asc': 'price ↑',
+  'price-desc': 'price ↓',
+};
+
+const SORTERS: Record<SortKey, (a: Listing, b: Listing) => number> = {
+  newest: (a, b) => b.createdAt - a.createdAt,
+  trending: (a, b) => (b.hot ?? 0) - (a.hot ?? 0) || b.createdAt - a.createdAt,
+  rating: (a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1) || (b.jobsCompleted ?? 0) - (a.jobsCompleted ?? 0),
+  'price-asc': (a, b) => a.priceUct - b.priceUct,
+  'price-desc': (a, b) => b.priceUct - a.priceUct,
+};
+
 export function Marketplace({ online }: { online: boolean | null }) {
   const { session, signIn } = useAuth();
   const toast = useToast();
@@ -12,6 +30,8 @@ export function Marketplace({ online }: { online: boolean | null }) {
   const [trending, setTrending] = useState<Listing[]>([]);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [cat, setCat] = useState<Category | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortKey>('newest');
   const [hiring, setHiring] = useState<Listing | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -71,10 +91,19 @@ export function Marketplace({ online }: { online: boolean | null }) {
     setFavIds(new Set(favSet));
   };
 
-  const shown = useMemo(
-    () => (listings ?? []).filter((l) => cat === 'all' || l.category === cat),
-    [listings, cat],
-  );
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let arr = (listings ?? []).filter((l) => cat === 'all' || l.category === cat);
+    if (q) {
+      arr = arr.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          l.description.toLowerCase().includes(q) ||
+          l.agentNametag.toLowerCase().includes(q),
+      );
+    }
+    return [...arr].sort(SORTERS[sort]);
+  }, [listings, cat, query, sort]);
 
   return (
     <>
@@ -139,11 +168,41 @@ export function Marketplace({ online }: { online: boolean | null }) {
         </div>
       </div>
 
+      <div className="mkt-tools">
+        <div className="search">
+          <span className="search__i">⌕</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search services, agents…"
+            aria-label="search listings"
+          />
+          {query && (
+            <button className="search__x" onClick={() => setQuery('')} aria-label="clear search">
+              ×
+            </button>
+          )}
+        </div>
+        <label className="sortsel">
+          <span>sort</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <option key={k} value={k}>
+                {SORT_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       {err && <div className="empty">couldn&rsquo;t reach the bazaar — {err}</div>}
       {!err && listings === null && <div className="empty">loading listings…</div>}
-      {!err && listings !== null && shown.length === 0 && (
+      {!err && listings !== null && shown.length === 0 && (listings.length > 0 || query || cat !== 'all') ? (
+        <div className="empty">no services match your search — try a different term or category.</div>
+      ) : null}
+      {!err && listings !== null && listings.length === 0 && (
         <div className="empty">
-          no listings yet{online === false ? ' · backend offline' : ''} — be the first to <b>publish an agent</b>.
+          no listings yet{online === false ? ' · waking up' : ''} — be the first to <b>publish an agent</b>.
         </div>
       )}
 
