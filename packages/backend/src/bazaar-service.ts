@@ -1,17 +1,24 @@
 import {
   applyEscrowEvent,
   applyOutcome,
+  applyRating,
+  clampStars,
+  earnedAchievements,
+  hotScore,
   isAutoReleasable,
   makeListing,
   newReputation,
   openEscrow,
   reputationView,
+  validateReview,
+  type Achievement,
   type EscrowJob,
   type EscrowState,
   type Listing,
   type ListingInput,
   type Reputation,
   type ReputationView,
+  type Review,
   type ServiceInvocation,
   type ServiceResult,
 } from '@bazaar/core';
@@ -36,21 +43,34 @@ export interface JobSummary {
   updatedAt: number;
 }
 
+/** A listing plus the platform metadata the marketplace renders. */
+export type DecoratedListing = Listing & {
+  favorites: number;
+  hot: number;
+  avgRating: number | null;
+  ratingCount: number;
+  jobsCompleted: number;
+  successRate: number;
+};
+
 /** Aggregated public view of one principal's activity on the bazaar. */
 export interface ProfileView {
   principal: string;
   nametag?: string;
   chainPubkey?: string;
   reputation: ReputationView;
-  listings: Listing[];
+  listings: DecoratedListing[];
   asProvider: JobSummary[];
   asBuyer: JobSummary[];
+  reviews: Review[];
+  achievements: Achievement[];
   stats: {
     listingsActive: number;
     jobsAsProvider: number;
     jobsAsBuyer: number;
     earnedUct: number;
     spentUct: number;
+    favoritesReceived: number;
   };
 }
 
@@ -105,6 +125,7 @@ export interface JobView {
   job: EscrowJob;
   result?: ServiceResult;
   settlement?: Settlement;
+  review?: Review;
 }
 
 /**
@@ -131,6 +152,14 @@ export class BazaarService {
   /** escrowRef -> jobId, for matching an incoming funding memo to its job. */
   private readonly escrowIndex = new Map<string, string>();
   private readonly seenFunding = new Set<string>();
+  /** jobId -> verified-purchase review (one per job). */
+  private readonly reviews = new Map<string, Review>();
+  /** provider principal -> jobIds they've been reviewed on (newest last). */
+  private readonly reviewsByProvider = new Map<string, string[]>();
+  /** principal -> the set of listingIds they've favorited. */
+  private readonly favorites = new Map<string, Set<string>>();
+  /** listingId -> favorite count (denormalized for cheap reads). */
+  private readonly favoriteCounts = new Map<string, number>();
 
   // Settlement is serialized so escrow payouts can't race on coin selection.
   private payLock: Promise<void> = Promise.resolve();
@@ -407,6 +436,7 @@ export class BazaarService {
       job,
       ...(this.results.has(jobId) ? { result: this.results.get(jobId) } : {}),
       ...(this.settlements.has(jobId) ? { settlement: this.settlements.get(jobId) } : {}),
+      ...(this.reviews.has(jobId) ? { review: this.reviews.get(jobId) } : {}),
     };
   }
 
@@ -420,7 +450,8 @@ export class BazaarService {
     const key = toPrincipal(principal);
     const listings = [...this.listings.values()]
       .filter((l) => l.active && l.agentNametag === key)
-      .sort((a, b) => b.createdAt - a.createdAt);
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((l) => this.decorateListing(l));
 
     const asProvider: JobSummary[] = [];
     const asBuyer: JobSummary[] = [];
@@ -432,8 +463,25 @@ export class BazaarService {
     asBuyer.sort((a, b) => b.updatedAt - a.updatedAt);
 
     const reputation = this.reputationOf(key);
+    const rep = this.reputations.get(key);
     const spentUct = asBuyer.filter((j) => j.state === 'released').reduce((s, j) => s + j.amountUct, 0);
     const chainPubkey = this.pubkeyOf(key); // best-effort, once they've published or traded
+    const favoritesReceived = listings.reduce((s, l) => s + l.favorites, 0);
+    const distinctProvidersBought = new Set(
+      asBuyer.filter((j) => j.state === 'released').map((j) => j.counterparty),
+    ).size;
+
+    const achievements = earnedAchievements({
+      listingsPublished: listings.length,
+      jobsSoldReleased: reputation.jobsCompleted,
+      jobsSoldRefunded: rep?.jobsRefunded ?? 0,
+      earnedUct: reputation.volumeUct,
+      avgRating: reputation.avgRating,
+      ratingCount: rep?.ratingCount ?? 0,
+      jobsBoughtReleased: asBuyer.filter((j) => j.state === 'released').length,
+      spentUct,
+      distinctProvidersBought,
+    });
 
     return {
       principal: key,
@@ -443,12 +491,15 @@ export class BazaarService {
       listings,
       asProvider,
       asBuyer,
+      reviews: this.reviewsOf(key),
+      achievements,
       stats: {
         listingsActive: listings.length,
         jobsAsProvider: asProvider.length,
         jobsAsBuyer: asBuyer.length,
         earnedUct: reputation.volumeUct,
         spentUct,
+        favoritesReceived,
       },
     };
   }
@@ -478,6 +529,137 @@ export class BazaarService {
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };
+  }
+
+  // ---- social: listings meta, trending, favorites, reviews ----
+
+  /** Attach favorites + a time-decayed "hot" score + rating to a listing. */
+  decorateListing(listing: Listing): DecoratedListing {
+    const favorites = this.favoriteCounts.get(listing.id) ?? 0;
+    const rep = this.reputations.get(listing.agentNametag);
+    const view = reputationView(rep ?? newReputation(listing.agentNametag));
+    const hot = hotScore({
+      jobActivityAt: this.jobActivityFor(listing.id),
+      favorites,
+      avgRating: view.avgRating,
+      ratingCount: rep?.ratingCount ?? 0,
+    });
+    return {
+      ...listing,
+      favorites,
+      hot,
+      avgRating: view.avgRating,
+      ratingCount: rep?.ratingCount ?? 0,
+      jobsCompleted: view.jobsCompleted,
+      successRate: view.successRate,
+    };
+  }
+
+  /** Active listings, decorated, newest first. */
+  listingsDecorated(): DecoratedListing[] {
+    return this.getListings().map((l) => this.decorateListing(l));
+  }
+
+  /** The hottest active listings (highest hot score first). */
+  trending(limit = 4): DecoratedListing[] {
+    return this.listingsDecorated()
+      .sort((a, b) => b.hot - a.hot || b.createdAt - a.createdAt)
+      .slice(0, limit)
+      .filter((l) => l.hot > 0 || l.favorites > 0);
+  }
+
+  /** `updatedAt` of each job for a listing that saw real economic activity (funded+). */
+  private jobActivityFor(listingId: string): number[] {
+    const out: number[] = [];
+    for (const job of this.jobs.values()) {
+      if (job.listingId === listingId && job.state !== 'quoted' && job.state !== 'cancelled') {
+        out.push(job.updatedAt);
+      }
+    }
+    return out;
+  }
+
+  /** Toggle a caller's favorite on a listing. Returns the new state + count. */
+  toggleFavorite(listingId: string, caller: Identity): { favorited: boolean; favorites: number } {
+    if (!this.listings.has(listingId)) throw new Error('unknown listing');
+    const principal = principalOf(caller);
+    const set = this.favorites.get(principal) ?? new Set<string>();
+    let favorited: boolean;
+    if (set.has(listingId)) {
+      set.delete(listingId);
+      favorited = false;
+    } else {
+      set.add(listingId);
+      favorited = true;
+    }
+    this.favorites.set(principal, set);
+    const count = Math.max(0, (this.favoriteCounts.get(listingId) ?? 0) + (favorited ? 1 : -1));
+    this.favoriteCounts.set(listingId, count);
+    return { favorited, favorites: count };
+  }
+
+  /** The listingIds a principal has favorited (for the client to mark stars). */
+  favoriteIdsOf(caller: Identity): string[] {
+    return [...(this.favorites.get(principalOf(caller)) ?? [])];
+  }
+
+  /** The active listings a principal has favorited, decorated. */
+  favoritesDecorated(caller: Identity): DecoratedListing[] {
+    const ids = this.favorites.get(principalOf(caller)) ?? new Set<string>();
+    return [...ids]
+      .map((id) => this.listings.get(id))
+      .filter((l): l is Listing => !!l && l.active)
+      .map((l) => this.decorateListing(l));
+  }
+
+  /**
+   * Record a verified-purchase review. Only the buyer of a RELEASED job may
+   * review it, and only once. The star rating folds into the provider's
+   * reputation.
+   */
+  postReview(input: { jobId: string; stars: number; text?: string }, caller: Identity): Review {
+    const job = this.requireJob(input.jobId);
+    this.assertBuyer(job, caller);
+    if (job.state !== 'released') throw new Error('you can only review a completed (released) job');
+    if (this.reviews.has(job.jobId)) throw new Error('this job has already been reviewed');
+    const text = (input.text ?? '').trim();
+    const check = validateReview(input.stars, text);
+    if (!check.ok) throw new Error(check.errors.join('; '));
+
+    const review: Review = {
+      jobId: job.jobId,
+      listingId: job.listingId,
+      providerNametag: job.providerNametag,
+      buyerNametag: job.buyerNametag,
+      stars: clampStars(input.stars),
+      text,
+      createdAt: Date.now(),
+    };
+    this.reviews.set(job.jobId, review);
+    const list = this.reviewsByProvider.get(job.providerNametag) ?? [];
+    list.push(job.jobId);
+    this.reviewsByProvider.set(job.providerNametag, list);
+    this.reputations.set(job.providerNametag, applyRating(this.repOf(job.providerNametag), review.stars));
+    this.log.info(`review posted: ${review.stars}★ for ${job.providerNametag} (job ${job.jobId})`);
+    return review;
+  }
+
+  /** Whether a job can still be reviewed by its buyer (released + not yet reviewed). */
+  reviewableByBuyer(jobId: string, caller: Identity): boolean {
+    const job = this.jobs.get(jobId);
+    if (!job || job.state !== 'released' || this.reviews.has(jobId)) return false;
+    const buyer = this.jobParties.get(jobId)?.buyer;
+    return !buyer?.chainPubkey || buyer.chainPubkey === caller.chainPubkey;
+  }
+
+  /** Reviews received by a provider principal, newest first. */
+  reviewsOf(principal: string): Review[] {
+    const key = toPrincipal(principal);
+    const ids = this.reviewsByProvider.get(key) ?? [];
+    return ids
+      .map((id) => this.reviews.get(id))
+      .filter((r): r is Review => !!r)
+      .sort((a, b) => b.createdAt - a.createdAt);
   }
 
   private repOf(nametag: string): Reputation {

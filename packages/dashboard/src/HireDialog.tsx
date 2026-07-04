@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type EscrowState, type HireResult, type JobView, type Listing } from './lib/api';
+import { api, type EscrowState, type HireResult, type JobView, type Listing, type Review } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 
 const STEPS: { key: EscrowState; label: string }[] = [
@@ -23,6 +23,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
   const [busy, setBusy] = useState(false);
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
   const pollRef = useRef<number | null>(null);
 
   useEffect(
@@ -223,6 +224,16 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                   </button>
                 </div>
               )}
+              {state === 'released' && (
+                <ReviewBlock
+                  provider={listing.agentNametag}
+                  existing={review ?? jobv?.review ?? null}
+                  onSubmit={async (stars, text) => {
+                    const r = await api.review(hire.job.jobId, stars, text);
+                    setReview(r);
+                  }}
+                />
+              )}
               {(state === 'released' || terminalBad) && (
                 <div className="dialog__actions">
                   <button className="btn" onClick={onClose}>
@@ -270,5 +281,80 @@ function CopyBtn({ v }: { v: string }) {
     <button className="copy" onClick={() => navigator.clipboard?.writeText(v)}>
       copy
     </button>
+  );
+}
+
+function ReviewBlock({
+  provider,
+  existing,
+  onSubmit,
+}: {
+  provider: string;
+  existing: Review | null;
+  onSubmit: (stars: number, text: string) => Promise<void>;
+}) {
+  const [stars, setStars] = useState(5);
+  const [hover, setHover] = useState(0);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (existing) {
+    return (
+      <div className="reviewbox reviewbox--done">
+        <div className="reviewbox__h">your review</div>
+        <div className="stars stars--static">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <span key={n} className={n <= existing.stars ? 'star star--on' : 'star'}>
+              ★
+            </span>
+          ))}
+        </div>
+        {existing.text && <p className="reviewbox__text">“{existing.text}”</p>}
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSubmit(stars, text.trim());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'could not post review');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="reviewbox">
+      <div className="reviewbox__h">rate {provider}</div>
+      <div className="stars" onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={n <= (hover || stars) ? 'star star--on' : 'star'}
+            onMouseEnter={() => setHover(n)}
+            onClick={() => setStars(n)}
+            aria-label={`${n} stars`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      <textarea
+        className="reviewbox__input"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="How did it go? (optional)"
+        maxLength={600}
+      />
+      {err && <div className="formmsg formmsg--bad">{err}</div>}
+      <button className="btn btn--primary btn--sm" disabled={busy} onClick={submit}>
+        {busy ? 'posting…' : 'Post review'}
+      </button>
+    </div>
   );
 }

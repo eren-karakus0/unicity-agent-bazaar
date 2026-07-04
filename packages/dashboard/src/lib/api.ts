@@ -18,6 +18,30 @@ export interface Listing {
   channel: DeliveryChannel;
   active: boolean;
   createdAt: number;
+  // platform metadata (present on decorated responses)
+  favorites?: number;
+  hot?: number;
+  avgRating?: number | null;
+  ratingCount?: number;
+  jobsCompleted?: number;
+  successRate?: number;
+}
+
+export interface Review {
+  jobId: string;
+  listingId: string;
+  providerNametag: string;
+  buyerNametag: string;
+  stars: number;
+  text: string;
+  createdAt: number;
+}
+
+export interface Achievement {
+  id: string;
+  label: string;
+  description: string;
+  side: 'provider' | 'buyer';
 }
 
 export type EscrowState =
@@ -72,6 +96,7 @@ export interface JobView {
   job: EscrowJob;
   result?: ServiceResult;
   settlement?: Settlement;
+  review?: Review;
 }
 
 export interface ReputationView {
@@ -102,12 +127,15 @@ export interface ProfileView {
   listings: Listing[];
   asProvider: JobSummary[];
   asBuyer: JobSummary[];
+  reviews: Review[];
+  achievements: Achievement[];
   stats: {
     listingsActive: number;
     jobsAsProvider: number;
     jobsAsBuyer: number;
     earnedUct: number;
     spentUct: number;
+    favoritesReceived: number;
   };
 }
 
@@ -192,4 +220,20 @@ export const api = {
   profile: (principal: string) =>
     get<{ profile: ProfileView }>(`/api/profile/${encodeURIComponent(principal)}`).then((r) => r.profile),
   myProfile: () => get<{ profile: ProfileView }>('/api/profile/me').then((r) => r.profile),
+
+  // ---- social ----
+  trending: (n = 6) =>
+    get<{ listings: Listing[] }>(`/api/listings/trending?n=${n}`).then((r) => r.listings),
+  myFavorites: () => get<{ listings: Listing[]; ids: string[] }>('/api/favorites'),
+  toggleFavorite: (listingId: string) =>
+    post<{ favorited: boolean; favorites: number }>(
+      `/api/listings/${encodeURIComponent(listingId)}/favorite`,
+      {},
+    ),
+  review: (jobId: string, stars: number, text: string) =>
+    post<{ review: Review }>(`/api/jobs/${encodeURIComponent(jobId)}/review`, { stars, text }).then(
+      (r) => r.review,
+    ),
+  reviews: (principal: string) =>
+    get<{ reviews: Review[] }>(`/api/reviews/${encodeURIComponent(principal)}`).then((r) => r.reviews),
 };

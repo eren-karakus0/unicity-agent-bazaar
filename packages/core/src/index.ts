@@ -3,3 +3,6 @@ export * from './ids.js';
 export * from './escrow.js';
 export * from './listing.js';
 export * from './reputation.js';
+export * from './review.js';
+export * from './trending.js';
+export * from './achievements.js';

@@ -860,7 +860,7 @@ button {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
   margin: 28px 0 40px;
 }
@@ -1014,4 +1014,203 @@ button {
   .acct__id {
     max-width: 130px;
   }
+}
+
+/* ---- social: cards, favorites, trending, badges, reviews ---- */
+.card__rep {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.card__star {
+  color: var(--warn);
+}
+.card--hot {
+  border-color: var(--border-orange);
+  box-shadow: 0 0 0 1px rgba(255, 111, 0, 0.12), 0 14px 40px rgba(255, 111, 0, 0.08);
+}
+.card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: 0.16s;
+}
+.fav:hover {
+  border-color: var(--border-orange);
+  color: var(--warn);
+}
+.fav--on {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.08);
+}
+.fav__n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* achievements */
+.badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 40px;
+}
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 12px 14px;
+}
+.badge__i {
+  font-size: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.badge--provider .badge__i {
+  color: var(--brand-orange);
+  background: rgba(255, 111, 0, 0.1);
+}
+.badge--buyer .badge__i {
+  color: var(--ok);
+  background: rgba(61, 220, 151, 0.1);
+}
+.badge__l {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.badge__d {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* reviews list */
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 40px;
+}
+.rev {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 14px 16px;
+}
+.rev__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rev__stars {
+  color: var(--warn);
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+.rev__stars-off {
+  color: var(--border-strong);
+}
+.rev__by {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--brand-orange);
+}
+.rev__t {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.rev__text {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* review form (hire dialog) */
+.reviewbox {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  padding: 16px;
+}
+.reviewbox--done {
+  border-color: rgba(255, 176, 32, 0.25);
+}
+.reviewbox__h {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.reviewbox__text {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.stars {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.star {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--border-strong);
+  cursor: pointer;
+  transition: 0.12s;
+}
+.stars--static .star {
+  cursor: default;
+  font-size: 20px;
+}
+.star--on {
+  color: var(--warn);
+}
+.reviewbox__input {
+  width: 100%;
+  background: var(--bg-root);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 56px;
+  margin-bottom: 12px;
+}
+.reviewbox__input:focus {
+  outline: none;
+  border-color: var(--border-orange);
 }

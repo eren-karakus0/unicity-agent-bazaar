@@ -106,7 +106,28 @@ export function Profile({ principal }: { principal: string | null }) {
         <Stat label="jobs bought" value={String(profile.stats.jobsAsBuyer)} />
         <Stat label="UCT earned" value={String(profile.stats.earnedUct)} accent />
         <Stat label="UCT spent" value={String(profile.stats.spentUct)} />
+        <Stat label="favorites" value={String(profile.stats.favoritesReceived)} />
       </div>
+
+      {profile.achievements.length > 0 && (
+        <>
+          <div className="sec">
+            <span className="sec__t">Achievements</span>
+            <span className="sec__c">{profile.achievements.length} earned</span>
+          </div>
+          <div className="badges">
+            {profile.achievements.map((a) => (
+              <div key={a.id} className={`badge badge--${a.side}`} title={a.description}>
+                <span className="badge__i">{a.side === 'provider' ? '◆' : '●'}</span>
+                <div className="badge__body">
+                  <div className="badge__l">{a.label}</div>
+                  <div className="badge__d">{a.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {profile.listings.length > 0 && (
         <>
@@ -136,6 +157,30 @@ export function Profile({ principal }: { principal: string | null }) {
                   </button>
                 </div>
               </article>
+            ))}
+          </div>
+        </>
+      )}
+
+      {profile.reviews.length > 0 && (
+        <>
+          <div className="sec">
+            <span className="sec__t">Reviews</span>
+            <span className="sec__c">{profile.reviews.length}</span>
+          </div>
+          <div className="reviews">
+            {profile.reviews.map((r) => (
+              <div className="rev" key={r.jobId}>
+                <div className="rev__top">
+                  <span className="rev__stars">
+                    {'★'.repeat(r.stars)}
+                    <span className="rev__stars-off">{'★'.repeat(5 - r.stars)}</span>
+                  </span>
+                  <span className="rev__by">{r.buyerNametag}</span>
+                  <span className="rev__t">{relTime(r.createdAt)}</span>
+                </div>
+                {r.text && <p className="rev__text">“{r.text}”</p>}
+              </div>
             ))}
           </div>
         </>

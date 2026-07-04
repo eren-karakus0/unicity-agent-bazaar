@@ -199,7 +199,23 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/listings' && method === 'GET') {
-    json(res, 200, { listings: svc.getListings() });
+    json(res, 200, { listings: svc.listingsDecorated() });
+    return;
+  }
+
+  if (pathname === '/api/listings/trending' && method === 'GET') {
+    const n = Number(url.searchParams.get('n') ?? '4');
+    json(res, 200, { listings: svc.trending(Number.isFinite(n) ? n : 4) });
+    return;
+  }
+
+  if (pathname === '/api/favorites' && method === 'GET') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in to see your favorites' });
+      return;
+    }
+    json(res, 200, { listings: svc.favoritesDecorated(identity), ids: svc.favoriteIdsOf(identity) });
     return;
   }
 
@@ -234,6 +250,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  const favMatch = pathname.match(/^\/api\/listings\/([^/]+)\/favorite$/);
+  if (favMatch && method === 'POST') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in to favorite a listing' });
+      return;
+    }
+    try {
+      json(res, 200, svc.toggleFavorite(decodeURIComponent(favMatch[1]!), identity));
+    } catch (e) {
+      json(res, 400, { error: e instanceof Error ? e.message : 'could not favorite' });
+    }
+    return;
+  }
+
   const listingMatch = pathname.match(/^\/api\/listings\/([^/]+)$/);
   if (listingMatch && method === 'GET') {
     const listing = svc.getListing(decodeURIComponent(listingMatch[1]!));
@@ -241,7 +272,7 @@ const server = http.createServer((req, res) => {
       json(res, 404, { error: 'no such listing' });
       return;
     }
-    json(res, 200, { listing });
+    json(res, 200, { listing: svc.decorateListing(listing) });
     return;
   }
 
@@ -266,7 +297,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(accept|dispute|resolve))?$/);
+  const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(accept|dispute|resolve|review))?$/);
   if (jobMatch) {
     const jobId = decodeURIComponent(jobMatch[1]!);
     const action = jobMatch[2];
@@ -291,6 +322,12 @@ const server = http.createServer((req, res) => {
             json(res, 200, { job: svc.acceptJob(jobId, identity) });
           } else if (action === 'dispute') {
             json(res, 200, { job: svc.disputeJob(jobId, identity) });
+          } else if (action === 'review') {
+            const review = svc.postReview(
+              { jobId, stars: Number(body.stars), text: str(body.text) },
+              identity,
+            );
+            json(res, 200, { review });
           } else {
             if (!env.auth.operators.includes(identity.chainPubkey)) {
               json(res, 403, { error: 'only a bazaar operator can resolve disputes' });
@@ -311,6 +348,12 @@ const server = http.createServer((req, res) => {
   const repMatch = pathname.match(/^\/api\/reputation\/([^/]+)$/);
   if (repMatch && method === 'GET') {
     json(res, 200, { reputation: svc.reputationOf(decodeURIComponent(repMatch[1]!)) });
+    return;
+  }
+
+  const reviewsMatch = pathname.match(/^\/api\/reviews\/(.+)$/);
+  if (reviewsMatch && method === 'GET') {
+    json(res, 200, { reviews: svc.reviewsOf(decodeURIComponent(reviewsMatch[1]!)) });
     return;
   }
 

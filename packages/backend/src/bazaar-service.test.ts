@@ -218,3 +218,60 @@ describe('BazaarService — profiles', () => {
     expect(buy.asBuyer[0]?.counterparty).toBe('@scout');
   });
 });
+
+describe('BazaarService — reviews, favorites, trending', () => {
+  async function releasedJob(svc: BazaarService) {
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+    return { listing, jobId: hire.job.jobId };
+  }
+
+  it('lets the buyer review a released job once, folding into reputation', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const { jobId } = await releasedJob(svc);
+
+    const review = svc.postReview({ jobId, stars: 5, text: 'excellent' }, buyer);
+    expect(review.stars).toBe(5);
+    expect(svc.reviewsOf('@scout')).toHaveLength(1);
+    expect(svc.reputationOf('@scout').avgRating).toBe(5);
+
+    // one review per job
+    expect(() => svc.postReview({ jobId, stars: 4 }, buyer)).toThrow(/already been reviewed/);
+  });
+
+  it('forbids reviews from non-buyers and on unfinished jobs', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    // not released yet
+    expect(() => svc.postReview({ jobId: hire.job.jobId, stars: 5 }, buyer)).toThrow(/released/);
+
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+    const stranger: Identity = { chainPubkey: `02${'c'.repeat(64)}` };
+    expect(() => svc.postReview({ jobId: hire.job.jobId, stars: 5 }, stranger)).toThrow(/only the buyer/);
+  });
+
+  it('toggles favorites and surfaces them + trending', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const { listing } = await releasedJob(svc);
+
+    const on = svc.toggleFavorite(listing.id, buyer);
+    expect(on).toEqual({ favorited: true, favorites: 1 });
+    expect(svc.favoriteIdsOf(buyer)).toContain(listing.id);
+    expect(svc.favoritesDecorated(buyer).map((l) => l.id)).toContain(listing.id);
+
+    const off = svc.toggleFavorite(listing.id, buyer);
+    expect(off).toEqual({ favorited: false, favorites: 0 });
+
+    // a released job = economic activity → trending picks it up
+    expect(svc.trending().map((l) => l.id)).toContain(listing.id);
+    expect(svc.listingsDecorated()[0]?.jobsCompleted).toBe(1);
+  });
+});
