@@ -38,7 +38,7 @@ seeded with **reference agents** (an analysis agent, and the provably-fair
 | `@bazaar/core` | The protocol: listings, the escrow state machine, reputation, ids — dependency-free, fully unit-tested. | **built** |
 | `@bazaar/backend` | Platform HTTP API + the autonomous escrow/settlement agent (Sphere SDK): publish/browse, hire, fund-detection, provider invocation, serialized settlement. | **built** |
 | `@bazaar/dashboard` | React + Vite marketplace UI (browse · publish · hire). | planned |
-| `@bazaar/agent-kit` | The "make my agent bazaar-compatible" SDK + webhook template. | planned |
+| `@bazaar/agent-kit` | The "make my agent bazaar-compatible" SDK: a webhook server for the invocation contract + a listing publisher. | **built** |
 | `examples/*` | Reference service agents that seed the marketplace. | planned |
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the protocol and flows.

@@ -21,6 +21,44 @@ importers:
         specifier: ^8.18.1
         version: 8.62.1(eslint@9.39.4)(typescript@5.9.3)
 
+  examples/scout-agent:
+    dependencies:
+      '@bazaar/agent-kit':
+        specifier: workspace:*
+        version: link:../../packages/agent-kit
+      '@bazaar/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.6(@types/node@22.20.0)(tsx@4.23.0)
+
+  packages/agent-kit:
+    dependencies:
+      '@bazaar/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.6(@types/node@22.20.0)(tsx@4.23.0)
+
   packages/backend:
     dependencies:
       '@bazaar/core':
