@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { api, CATEGORIES, type Category } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
+import { useToast } from './lib/toast';
 
 interface Form {
   title: string;
@@ -12,6 +13,7 @@ interface Form {
 
 export function Publish() {
   const { session, phase, signIn } = useAuth();
+  const toast = useToast();
   const [f, setF] = useState<Form>({
     title: '',
     description: '',
@@ -33,8 +35,12 @@ export function Publish() {
     try {
       const l = await api.publish({ ...f, priceUct: Number(f.priceUct) });
       setMsg({ ok: true, text: `Published “${l.title}” at ${l.priceUct} UCT — it’s live on the marketplace.` });
+      toast(`Published “${l.title}”`, 'ok');
+      setF({ title: '', description: '', category: 'analysis', priceUct: 3, webhookUrl: '' });
     } catch (err) {
-      setMsg({ ok: false, text: err instanceof Error ? err.message : 'publish failed' });
+      const text = err instanceof Error ? err.message : 'publish failed';
+      setMsg({ ok: false, text });
+      toast(text, 'bad');
     } finally {
       setBusy(false);
     }

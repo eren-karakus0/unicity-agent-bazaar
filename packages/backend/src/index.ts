@@ -124,7 +124,10 @@ async function boot(): Promise<void> {
 function setCors(res: http.ServerResponse): void {
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
-  res.setHeader('access-control-allow-headers', 'content-type');
+  // `authorization` is REQUIRED here: signed-in requests carry a Bearer token,
+  // which triggers a CORS preflight — omitting it blocks every authed fetch.
+  res.setHeader('access-control-allow-headers', 'content-type, authorization');
+  res.setHeader('access-control-max-age', '600');
 }
 function json(res: http.ServerResponse, status: number, obj: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' });

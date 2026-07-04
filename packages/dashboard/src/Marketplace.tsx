@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, CATEGORIES, type Category, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
 import { useAuth } from './lib/auth';
+import { useToast } from './lib/toast';
 import { go } from './lib/nav';
 
 export function Marketplace({ online }: { online: boolean | null }) {
   const { session, signIn } = useAuth();
+  const toast = useToast();
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [trending, setTrending] = useState<Listing[]>([]);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
@@ -45,13 +47,14 @@ export function Marketplace({ online }: { online: boolean | null }) {
     try {
       const res = await api.toggleFavorite(listing.id);
       setCount(listing.id, res.favorites, res.favorited, next);
-    } catch {
+    } catch (e) {
       // revert on failure
       const revert = new Set(next);
       if (willFav) revert.delete(listing.id);
       else revert.add(listing.id);
       setFavIds(revert);
       patchCount(listing.id, willFav ? -1 : 1);
+      toast(e instanceof Error ? e.message : 'could not update favorite', 'bad');
     }
   };
 

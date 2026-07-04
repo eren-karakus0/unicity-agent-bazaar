@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, type EscrowState, type JobSummary, type Listing, type ProfileView } from './lib/api';
 import { useAuth } from './lib/auth';
 import { HireDialog } from './HireDialog';
@@ -60,17 +60,30 @@ export function Profile({ principal }: { principal: string | null }) {
   const [hiring, setHiring] = useState<Listing | null>(null);
 
   const target = principal; // null = me
-  useEffect(() => {
-    setProfile(null);
+  const load = useCallback(() => {
     setErr(null);
     const req = target === null ? api.myProfile() : api.profile(target);
     req.then(setProfile).catch((e) => setErr(e instanceof Error ? e.message : 'could not load profile'));
   }, [target]);
 
+  useEffect(() => {
+    setProfile(null);
+    load();
+  }, [load]);
+
   if (target === null && !session) {
     return <div className="empty">Connect your wallet to see your profile.</div>;
   }
-  if (err) return <div className="empty">couldn&rsquo;t load this profile — {err}</div>;
+  if (err) {
+    return (
+      <div className="empty">
+        <div>couldn&rsquo;t load this profile — the bazaar may be waking up.</div>
+        <button className="btn btn--primary btn--sm" style={{ marginTop: 16 }} onClick={load}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!profile) return <div className="empty">loading profile…</div>;
 
   const isMe = !!session && profile.principal === (session.nametag ? `@${session.nametag}` : session.chainPubkey);

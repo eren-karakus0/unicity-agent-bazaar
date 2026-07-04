@@ -1,8 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, setAuthToken, type Identity } from './api';
+import { api, HttpError, setAuthToken, type Identity } from './api';
 import { useWallet, type WalletStatus } from './useWallet';
+import { useToast } from './toast';
 
 const TOKEN_KEY = 'bazaar-session-token';
+
+/** Decode our own session token client-side (the claims are signed, not secret). */
+function decodeToken(token: string): { identity: Identity; exp: number } | null {
+  try {
+    const body = token.slice(0, token.lastIndexOf('.'));
+    const pad = body.length % 4 === 0 ? '' : '='.repeat(4 - (body.length % 4));
+    const json = JSON.parse(atob(body.replace(/-/g, '+').replace(/_/g, '/') + pad)) as {
+      sub?: string;
+      tag?: string;
+      exp?: number;
+    };
+    if (!json.sub || typeof json.exp !== 'number') return null;
+    return { identity: { chainPubkey: json.sub, ...(json.tag ? { nametag: json.tag } : {}) }, exp: json.exp };
+  } catch {
+    return null;
+  }
+}
 
 export type AuthPhase = 'anonymous' | 'signing-in' | 'authenticated';
 
@@ -23,28 +41,40 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const wallet = useWallet();
+  const toast = useToast();
   const [session, setSession] = useState<Identity | null>(null);
   const [phase, setPhase] = useState<AuthPhase>('anonymous');
   const [error, setError] = useState<string | null>(null);
   const restored = useRef(false);
 
-  // Restore a stored session token on load and validate it against the backend.
+  // Restore a stored session on load. We decode the token locally so the user
+  // stays signed in INSTANTLY across refreshes — even while the backend is
+  // waking up. A background check only signs out on a definitive 401 (a truly
+  // invalid/expired token), never on a transient network error.
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
+    const decoded = decodeToken(token);
+    if (!decoded || decoded.exp < Date.now()) {
+      localStorage.removeItem(TOKEN_KEY);
+      return;
+    }
     setAuthToken(token);
+    setSession(decoded.identity);
+    setPhase('authenticated');
     api
       .me()
-      .then((identity) => {
-        setSession(identity);
-        setPhase('authenticated');
-      })
-      .catch(() => {
-        // Expired / invalid — clear it.
-        setAuthToken(null);
-        localStorage.removeItem(TOKEN_KEY);
+      .then((identity) => setSession(identity))
+      .catch((e) => {
+        if (e instanceof HttpError && e.status === 401) {
+          setAuthToken(null);
+          localStorage.removeItem(TOKEN_KEY);
+          setSession(null);
+          setPhase('anonymous');
+        }
+        // else: backend asleep/unreachable — keep the optimistic session.
       });
   }, []);
 
@@ -64,11 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(TOKEN_KEY, token);
       setSession(proven);
       setPhase('authenticated');
+      toast(`Signed in as ${proven.nametag ? `@${proven.nametag}` : 'your wallet'}`, 'ok');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'sign-in failed');
+      const msg = e instanceof Error ? e.message : 'sign-in failed';
+      setError(msg);
       setPhase('anonymous');
+      toast(msg, 'bad');
     }
-  }, [wallet]);
+  }, [wallet, toast]);
 
   const signOut = useCallback(async () => {
     setAuthToken(null);

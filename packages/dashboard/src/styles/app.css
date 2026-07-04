@@ -1214,3 +1214,72 @@ button {
   outline: none;
   border-color: var(--border-orange);
 }
+
+/* ---- connection state + toasts ---- */
+.hdr__net--wake {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.35);
+  animation: netpulse 1.4s ease-in-out infinite;
+}
+@keyframes netpulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.toasts {
+  position: fixed;
+  z-index: 200;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 40px));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: rgba(18, 18, 18, 0.94);
+  border: 1px solid var(--border-strong);
+  border-left-width: 3px;
+  border-radius: 11px;
+  padding: 12px 15px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  animation: toastin 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes toastin {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+.toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: none;
+}
+.toast--ok {
+  border-left-color: var(--ok);
+}
+.toast--ok .toast__dot {
+  background: var(--ok);
+}
+.toast--bad {
+  border-left-color: var(--bad);
+}
+.toast--bad .toast__dot {
+  background: var(--bad);
+}
+.toast--info {
+  border-left-color: var(--brand-orange);
+}
+.toast--info .toast__dot {
+  background: var(--brand-orange);
+}

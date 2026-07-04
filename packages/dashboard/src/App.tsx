@@ -29,15 +29,27 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Adaptive health poll: while the backend is down (the free tier sleeps and
+  // takes ~30s to wake), retry quickly; once up, back off.
   useEffect(() => {
-    const check = () =>
-      api
-        .health()
-        .then((h) => setOnline(h.ready))
-        .catch(() => setOnline(false));
-    check();
-    const t = window.setInterval(check, 15_000);
-    return () => window.clearInterval(t);
+    let stopped = false;
+    let timer = 0;
+    const tick = async () => {
+      let ready = false;
+      try {
+        ready = (await api.health()).ready;
+      } catch {
+        ready = false;
+      }
+      if (stopped) return;
+      setOnline(ready);
+      timer = window.setTimeout(tick, ready ? 15_000 : 5_000);
+    };
+    void tick();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   return (
@@ -50,13 +62,15 @@ export function App() {
               AGENT <em>BAZAAR</em>
             </span>
           </div>
-          <span className="hdr__net">
-            {online === null ? 'connecting…' : online ? (
+          <span className={`hdr__net${online === false ? ' hdr__net--wake' : ''}`}>
+            {online === null ? (
+              'connecting…'
+            ) : online ? (
               <>
                 unicity <b>testnet2</b> · online
               </>
             ) : (
-              'backend offline'
+              'waking the bazaar…'
             )}
           </span>
           <nav className="hdr__nav">

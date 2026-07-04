@@ -166,9 +166,20 @@ function authHeaders(): Record<string, string> {
   return authToken ? { authorization: `Bearer ${authToken}` } : {};
 }
 
+/** An HTTP error carrying the status code (network failures throw a plain Error). */
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { headers: { ...authHeaders() } });
-  if (!res.ok) throw new Error((await safeErr(res)) ?? `GET ${path} → ${res.status}`);
+  if (!res.ok) throw new HttpError((await safeErr(res)) ?? `GET ${path} → ${res.status}`, res.status);
   return res.json() as Promise<T>;
 }
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -177,7 +188,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'content-type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error((await safeErr(res)) ?? `POST ${path} → ${res.status}`);
+  if (!res.ok) throw new HttpError((await safeErr(res)) ?? `POST ${path} → ${res.status}`, res.status);
   return res.json() as Promise<T>;
 }
 async function safeErr(res: Response): Promise<string | undefined> {
