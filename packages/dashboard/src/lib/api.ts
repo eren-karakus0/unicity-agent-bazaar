@@ -1,0 +1,138 @@
+/** Typed client for the @bazaar/backend HTTP API. Mirrors the protocol shapes. */
+
+const BASE = (import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4600').replace(/\/$/, '');
+
+export type Category = 'analysis' | 'data' | 'creative' | 'automation' | 'game' | 'other';
+export const CATEGORIES: Category[] = ['analysis', 'data', 'creative', 'automation', 'game', 'other'];
+
+export type DeliveryChannel = { kind: 'webhook'; url: string } | { kind: 'capsule'; ref: string };
+
+export interface Listing {
+  id: string;
+  slug: string;
+  agentNametag: string;
+  title: string;
+  description: string;
+  category: Category;
+  priceUct: number;
+  channel: DeliveryChannel;
+  active: boolean;
+  createdAt: number;
+}
+
+export type EscrowState =
+  | 'quoted'
+  | 'funded'
+  | 'delivered'
+  | 'released'
+  | 'refunded'
+  | 'disputed'
+  | 'cancelled';
+
+export interface EscrowJob {
+  jobId: string;
+  escrowRef: string;
+  listingId: string;
+  buyerNametag: string;
+  providerNametag: string;
+  amountUct: number;
+  state: EscrowState;
+  createdAt: number;
+  updatedAt: number;
+  deliveredAt?: number;
+}
+
+export interface ServiceResult {
+  jobId: string;
+  ok: boolean;
+  output?: unknown;
+  error?: string;
+}
+
+export interface Settlement {
+  status: 'pending' | 'settled' | 'failed';
+  kind: 'release' | 'refund';
+  amountUct: number;
+  recipient: string;
+  txId?: string;
+  error?: string;
+  at: number;
+}
+
+export interface HireResult {
+  job: EscrowJob;
+  payTo: string;
+  memo: string;
+  amountUct: number;
+  coinId: string;
+  decimals: number;
+}
+
+export interface JobView {
+  job: EscrowJob;
+  result?: ServiceResult;
+  settlement?: Settlement;
+}
+
+export interface ReputationView {
+  agentNametag: string;
+  jobsCompleted: number;
+  successRate: number;
+  volumeUct: number;
+  avgRating: number | null;
+}
+
+export interface DepositInfo {
+  escrow: string;
+  coinId: string;
+  decimals: number;
+  symbol: string;
+}
+
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) throw new Error((await safeErr(res)) ?? `GET ${path} → ${res.status}`);
+  return res.json() as Promise<T>;
+}
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await safeErr(res)) ?? `POST ${path} → ${res.status}`);
+  return res.json() as Promise<T>;
+}
+async function safeErr(res: Response): Promise<string | undefined> {
+  try {
+    const data = (await res.json()) as { error?: string };
+    return data.error;
+  } catch {
+    return undefined;
+  }
+}
+
+export const api = {
+  health: () => get<{ ok: boolean; ready: boolean; escrow: string | null }>('/api/health'),
+  depositInfo: () => get<DepositInfo>('/api/deposit-info'),
+  listings: () => get<{ listings: Listing[] }>('/api/listings').then((r) => r.listings),
+  listing: (id: string) => get<{ listing: Listing }>(`/api/listings/${encodeURIComponent(id)}`).then((r) => r.listing),
+  publish: (input: {
+    agentNametag: string;
+    title: string;
+    description: string;
+    category: Category;
+    priceUct: number;
+    webhookUrl: string;
+  }) =>
+    post<{ listing: Listing }>('/api/listings', { ...input, channelKind: 'webhook' }).then((r) => r.listing),
+  hire: (listingId: string, buyerNametag: string, input: unknown) =>
+    post<HireResult>('/api/hire', { listingId, buyerNametag, input }),
+  job: (jobId: string) => get<JobView>(`/api/jobs/${encodeURIComponent(jobId)}`),
+  accept: (jobId: string) => post<{ job: EscrowJob }>(`/api/jobs/${encodeURIComponent(jobId)}/accept`, {}),
+  dispute: (jobId: string) => post<{ job: EscrowJob }>(`/api/jobs/${encodeURIComponent(jobId)}/dispute`, {}),
+  reputation: (nametag: string) =>
+    get<{ reputation: ReputationView }>(`/api/reputation/${encodeURIComponent(nametag.replace(/^@/, ''))}`).then(
+      (r) => r.reputation,
+    ),
+};
