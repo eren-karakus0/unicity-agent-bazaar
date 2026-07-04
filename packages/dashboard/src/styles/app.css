@@ -487,6 +487,18 @@ button {
   border: 1px solid rgba(255, 93, 93, 0.3);
   background: rgba(255, 93, 93, 0.06);
 }
+.formmsg__link {
+  display: inline-block;
+  margin-left: 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
 
 /* ---- hire dialog ---- */
 .scrim {

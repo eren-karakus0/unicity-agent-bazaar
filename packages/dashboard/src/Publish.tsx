@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { api, CATEGORIES, type Category } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
+import { go } from './lib/nav';
 
 interface Form {
   title: string;
@@ -72,7 +73,16 @@ export function Publish() {
         </div>
       ) : (
         <form className="panel" onSubmit={submit}>
-          {msg && <div className={`formmsg ${msg.ok ? 'formmsg--ok' : 'formmsg--bad'}`}>{msg.text}</div>}
+          {msg && (
+            <div className={`formmsg ${msg.ok ? 'formmsg--ok' : 'formmsg--bad'}`}>
+              {msg.text}
+              {msg.ok && (
+                <button type="button" className="formmsg__link" onClick={() => go('/')}>
+                  View on the marketplace →
+                </button>
+              )}
+            </div>
+          )}
           <div className="field">
             <label>publishing as</label>
             <div className="whoami">
