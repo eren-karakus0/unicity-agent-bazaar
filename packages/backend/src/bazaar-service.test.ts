@@ -183,4 +183,38 @@ describe('BazaarService — dispute', () => {
     const listing = svc.publishListing(publishInput, provider);
     expect(() => svc.hire({ listingId: listing.id, buyer: provider })).toThrow(/your own listing/);
   });
+
+  it('requires a @nametag to publish', () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const bare: Identity = { chainPubkey: `02${'d'.repeat(64)}` };
+    expect(() => svc.publishListing(publishInput, bare)).toThrow(/register a @nametag/);
+  });
+});
+
+describe('BazaarService — profiles', () => {
+  it('aggregates a principal’s listings, activity, and stats', async () => {
+    const sent: Sent[] = [];
+    const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer, input: { repo: 'x/y' } });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+
+    const prov = svc.profileOf('@scout');
+    expect(prov.nametag).toBe('scout');
+    expect(prov.chainPubkey).toBe(provider.chainPubkey);
+    expect(prov.listings.map((l) => l.id)).toContain(listing.id);
+    expect(prov.stats.jobsAsProvider).toBe(1);
+    expect(prov.stats.earnedUct).toBe(10);
+    expect(prov.asProvider[0]?.state).toBe('released');
+    expect(prov.asProvider[0]?.counterparty).toBe('@buyer');
+
+    const buy = svc.profileOf('@buyer');
+    expect(buy.stats.jobsAsBuyer).toBe(1);
+    expect(buy.stats.spentUct).toBe(10);
+    expect(buy.stats.listingsActive).toBe(0);
+    expect(buy.asBuyer[0]?.counterparty).toBe('@scout');
+  });
 });

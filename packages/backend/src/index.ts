@@ -20,7 +20,7 @@ import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
 import { BazaarService } from './bazaar-service.js';
-import { AuthService, type Identity } from './auth.js';
+import { AuthService, principalOf, type Identity } from './auth.js';
 import { createWebhookInvoker } from './webhook-client.js';
 
 const env = loadEnv();
@@ -311,6 +311,22 @@ const server = http.createServer((req, res) => {
   const repMatch = pathname.match(/^\/api\/reputation\/([^/]+)$/);
   if (repMatch && method === 'GET') {
     json(res, 200, { reputation: svc.reputationOf(decodeURIComponent(repMatch[1]!)) });
+    return;
+  }
+
+  const profileMatch = pathname.match(/^\/api\/profile\/(.+)$/);
+  if (profileMatch && method === 'GET') {
+    const raw = decodeURIComponent(profileMatch[1]!);
+    if (raw === 'me') {
+      const identity = identityOf(req);
+      if (!identity) {
+        json(res, 401, { error: 'not signed in' });
+        return;
+      }
+      json(res, 200, { profile: svc.profileOf(principalOf(identity)) });
+      return;
+    }
+    json(res, 200, { profile: svc.profileOf(raw) });
     return;
   }
 

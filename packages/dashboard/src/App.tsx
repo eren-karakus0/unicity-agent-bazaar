@@ -1,14 +1,33 @@
 import { useEffect, useState } from 'react';
 import { api } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
+import { go } from './lib/nav';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
+import { Profile } from './Profile';
 
-type View = 'market' | 'publish';
+type Route =
+  | { name: 'market' }
+  | { name: 'publish' }
+  | { name: 'profile'; principal: string | null };
+
+function parseHash(): Route {
+  const h = location.hash.replace(/^#/, '');
+  if (h.startsWith('/publish')) return { name: 'publish' };
+  if (h.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(h.slice('/agent/'.length)) };
+  if (h.startsWith('/profile')) return { name: 'profile', principal: null };
+  return { name: 'market' };
+}
 
 export function App() {
-  const [view, setView] = useState<View>(() => (location.hash === '#/publish' ? 'publish' : 'market'));
+  const [route, setRoute] = useState<Route>(parseHash);
   const [online, setOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const onHash = () => setRoute(parseHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   useEffect(() => {
     const check = () =>
@@ -21,16 +40,11 @@ export function App() {
     return () => window.clearInterval(t);
   }, []);
 
-  const go = (v: View) => {
-    setView(v);
-    location.hash = v === 'publish' ? '#/publish' : '#/';
-  };
-
   return (
     <>
       <header className="hdr">
         <div className="wrap hdr__in">
-          <div className="brand" onClick={() => go('market')} style={{ cursor: 'pointer' }}>
+          <div className="brand" onClick={() => go('/')} style={{ cursor: 'pointer' }}>
             <span className="brand__mark">B</span>
             <span className="brand__name">
               AGENT <em>BAZAAR</em>
@@ -46,18 +60,28 @@ export function App() {
             )}
           </span>
           <nav className="hdr__nav">
-            <button className={`navlink${view === 'market' ? ' navlink--on' : ''}`} onClick={() => go('market')}>
+            <button
+              className={`navlink${route.name === 'market' ? ' navlink--on' : ''}`}
+              onClick={() => go('/')}
+            >
               marketplace
             </button>
-            <button className={`navlink${view === 'publish' ? ' navlink--on' : ''}`} onClick={() => go('publish')}>
+            <button
+              className={`navlink${route.name === 'publish' ? ' navlink--on' : ''}`}
+              onClick={() => go('/publish')}
+            >
               publish agent
             </button>
-            <AccountChip />
+            <AccountChip active={route.name === 'profile' && route.principal === null} />
           </nav>
         </div>
       </header>
 
-      <main className="wrap">{view === 'market' ? <Marketplace online={online} /> : <Publish />}</main>
+      <main className="wrap">
+        {route.name === 'market' && <Marketplace online={online} />}
+        {route.name === 'publish' && <Publish />}
+        {route.name === 'profile' && <Profile principal={route.principal} />}
+      </main>
 
       <footer className="wrap foot">
         <span>
@@ -69,16 +93,20 @@ export function App() {
   );
 }
 
-function AccountChip() {
+function AccountChip({ active }: { active: boolean }) {
   const { session, phase, signIn, signOut } = useAuth();
 
   if (phase === 'authenticated' && session) {
     return (
       <div className="acct">
-        <span className="acct__id" title={session.chainPubkey}>
+        <button
+          className={`acct__id${active ? ' acct__id--on' : ''}`}
+          title={session.chainPubkey}
+          onClick={() => go('/profile')}
+        >
           <span className="acct__dot" />
           {displayName(session)}
-        </span>
+        </button>
         <button className="acct__out" onClick={() => void signOut()}>
           sign out
         </button>

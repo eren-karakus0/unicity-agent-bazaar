@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, CATEGORIES, type Category, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
+import { go } from './lib/nav';
 
 export function Marketplace({ online }: { online: boolean | null }) {
   const [listings, setListings] = useState<Listing[] | null>(null);
@@ -98,7 +99,12 @@ function ListingCard({ listing, delay, onHire }: { listing: Listing; delay: numb
       </div>
       <div>
         <div className="card__title">{listing.title}</div>
-        <div className="card__agent">{listing.agentNametag}</div>
+        <button
+          className="card__agent card__agent--link"
+          onClick={() => go(`/agent/${encodeURIComponent(listing.agentNametag)}`)}
+        >
+          {listing.agentNametag}
+        </button>
       </div>
       <p className="card__desc">{listing.description}</p>
       <div className="card__foot">

@@ -7,6 +7,7 @@ import {
   openEscrow,
   reputationView,
   type EscrowJob,
+  type EscrowState,
   type Listing,
   type ListingInput,
   type Reputation,
@@ -20,6 +21,45 @@ import type { Invoker } from './webhook-client.js';
 
 /** A publish request from an authenticated provider — the server assigns the owner. */
 export type PublishInput = Omit<ListingInput, 'agentNametag'>;
+
+/** A compact job row for profile pages. */
+export interface JobSummary {
+  jobId: string;
+  listingId: string;
+  listingTitle?: string;
+  amountUct: number;
+  state: EscrowState;
+  role: 'buyer' | 'provider';
+  /** The other party's principal (@nametag or pubkey). */
+  counterparty: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Aggregated public view of one principal's activity on the bazaar. */
+export interface ProfileView {
+  principal: string;
+  nametag?: string;
+  chainPubkey?: string;
+  reputation: ReputationView;
+  listings: Listing[];
+  asProvider: JobSummary[];
+  asBuyer: JobSummary[];
+  stats: {
+    listingsActive: number;
+    jobsAsProvider: number;
+    jobsAsBuyer: number;
+    earnedUct: number;
+    spentUct: number;
+  };
+}
+
+/** Normalize an identifier to a principal key: a pubkey stays hex, else `@nametag`. */
+export function toPrincipal(s: string): string {
+  const t = (s ?? '').trim();
+  if (/^0[23][0-9a-fA-F]{64}$/.test(t)) return t.toLowerCase();
+  return `@${t.replace(/^@/, '')}`;
+}
 
 /** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
 export interface BazaarAgent {
@@ -108,6 +148,9 @@ export class BazaarService {
 
   /** Publish a listing owned by an authenticated provider (its @nametag = the owner's). */
   publishListing(input: PublishInput, owner: Identity): Listing {
+    if (!owner.nametag) {
+      throw new Error('register a @nametag in your Sphere wallet before publishing a listing');
+    }
     const agentNametag = principalOf(owner);
     const listing = makeListing({ ...input, agentNametag }); // validates; throws on bad input
     this.listings.set(listing.id, listing);
@@ -368,8 +411,73 @@ export class BazaarService {
   }
 
   reputationOf(nametag: string): ReputationView {
-    const key = `@${nametag.trim().replace(/^@/, '')}`;
+    const key = toPrincipal(nametag);
     return reputationView(this.reputations.get(key) ?? newReputation(key));
+  }
+
+  /** Everything a profile page needs about one principal (@nametag or pubkey). */
+  profileOf(principal: string): ProfileView {
+    const key = toPrincipal(principal);
+    const listings = [...this.listings.values()]
+      .filter((l) => l.active && l.agentNametag === key)
+      .sort((a, b) => b.createdAt - a.createdAt);
+
+    const asProvider: JobSummary[] = [];
+    const asBuyer: JobSummary[] = [];
+    for (const job of this.jobs.values()) {
+      if (job.providerNametag === key) asProvider.push(this.summarize(job, 'provider'));
+      if (job.buyerNametag === key) asBuyer.push(this.summarize(job, 'buyer'));
+    }
+    asProvider.sort((a, b) => b.updatedAt - a.updatedAt);
+    asBuyer.sort((a, b) => b.updatedAt - a.updatedAt);
+
+    const reputation = this.reputationOf(key);
+    const spentUct = asBuyer.filter((j) => j.state === 'released').reduce((s, j) => s + j.amountUct, 0);
+    const chainPubkey = this.pubkeyOf(key); // best-effort, once they've published or traded
+
+    return {
+      principal: key,
+      ...(key.startsWith('@') ? { nametag: key.slice(1) } : {}),
+      ...(chainPubkey ? { chainPubkey } : {}),
+      reputation,
+      listings,
+      asProvider,
+      asBuyer,
+      stats: {
+        listingsActive: listings.length,
+        jobsAsProvider: asProvider.length,
+        jobsAsBuyer: asBuyer.length,
+        earnedUct: reputation.volumeUct,
+        spentUct,
+      },
+    };
+  }
+
+  /** Best-effort proven chain pubkey for a principal, from listings or job parties. */
+  private pubkeyOf(principal: string): string | undefined {
+    for (const owner of this.listingProviders.values()) {
+      if (principalOf(owner) === principal) return owner.chainPubkey;
+    }
+    for (const { buyer, provider } of this.jobParties.values()) {
+      if (principalOf(provider) === principal) return provider.chainPubkey;
+      if (principalOf(buyer) === principal) return buyer.chainPubkey;
+    }
+    return undefined;
+  }
+
+  private summarize(job: EscrowJob, role: 'buyer' | 'provider'): JobSummary {
+    const listing = this.listings.get(job.listingId);
+    return {
+      jobId: job.jobId,
+      listingId: job.listingId,
+      ...(listing ? { listingTitle: listing.title } : {}),
+      amountUct: job.amountUct,
+      state: job.state,
+      role,
+      counterparty: role === 'provider' ? job.buyerNametag : job.providerNametag,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
   }
 
   private repOf(nametag: string): Reputation {

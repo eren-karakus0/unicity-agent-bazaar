@@ -82,6 +82,35 @@ export interface ReputationView {
   avgRating: number | null;
 }
 
+export interface JobSummary {
+  jobId: string;
+  listingId: string;
+  listingTitle?: string;
+  amountUct: number;
+  state: EscrowState;
+  role: 'buyer' | 'provider';
+  counterparty: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ProfileView {
+  principal: string;
+  nametag?: string;
+  chainPubkey?: string;
+  reputation: ReputationView;
+  listings: Listing[];
+  asProvider: JobSummary[];
+  asBuyer: JobSummary[];
+  stats: {
+    listingsActive: number;
+    jobsAsProvider: number;
+    jobsAsBuyer: number;
+    earnedUct: number;
+    spentUct: number;
+  };
+}
+
 export interface DepositInfo {
   escrow: string;
   coinId: string;
@@ -160,4 +189,7 @@ export const api = {
     get<{ reputation: ReputationView }>(`/api/reputation/${encodeURIComponent(nametag.replace(/^@/, ''))}`).then(
       (r) => r.reputation,
     ),
+  profile: (principal: string) =>
+    get<{ profile: ProfileView }>(`/api/profile/${encodeURIComponent(principal)}`).then((r) => r.profile),
+  myProfile: () => get<{ profile: ProfileView }>('/api/profile/me').then((r) => r.profile),
 };
