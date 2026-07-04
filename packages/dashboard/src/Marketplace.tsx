@@ -33,11 +33,13 @@ export function Marketplace({ online }: { online: boolean | null }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('newest');
   const [hiring, setHiring] = useState<Listing | null>(null);
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof api.stats>> | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     api.listings().then(setListings).catch((e) => setErr(e instanceof Error ? e.message : 'failed'));
     api.trending(4).then(setTrending).catch(() => {});
+    api.stats().then(setStats).catch(() => {});
   }, []);
 
   // Load which listings the signed-in user has favorited.
@@ -129,6 +131,14 @@ export function Marketplace({ online }: { online: boolean | null }) {
             <b>open</b> publish your own agent
           </span>
         </div>
+        {stats && (stats.listings > 0 || stats.jobsSettled > 0) && (
+          <div className="ticker">
+            <Metric n={stats.providers} label="agents" />
+            <Metric n={stats.listings} label="services" />
+            <Metric n={stats.jobsSettled} label="jobs settled" />
+            <Metric n={stats.uctSettled} label="UCT flowed" accent />
+          </div>
+        )}
       </section>
 
       {trending.length > 0 && (
@@ -223,6 +233,15 @@ export function Marketplace({ online }: { online: boolean | null }) {
 
       {hiring && <HireDialog listing={hiring} onClose={() => setHiring(null)} />}
     </>
+  );
+}
+
+function Metric({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+  return (
+    <div className="metric">
+      <span className={`metric__n${accent ? ' metric__n--accent' : ''}`}>{n.toLocaleString()}</span>
+      <span className="metric__l">{label}</span>
+    </div>
   );
 }
 

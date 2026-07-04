@@ -203,6 +203,10 @@ async function safeErr(res: Response): Promise<string | undefined> {
 export const api = {
   health: () => get<{ ok: boolean; ready: boolean; escrow: string | null }>('/api/health'),
   depositInfo: () => get<DepositInfo>('/api/deposit-info'),
+  stats: () =>
+    get<{ stats: { providers: number; listings: number; jobsSettled: number; uctSettled: number; reviews: number } }>(
+      '/api/stats',
+    ).then((r) => r.stats),
   listings: () => get<{ listings: Listing[] }>('/api/listings').then((r) => r.listings),
   listing: (id: string) => get<{ listing: Listing }>(`/api/listings/${encodeURIComponent(id)}`).then((r) => r.listing),
 

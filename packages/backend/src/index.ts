@@ -219,6 +219,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === '/api/stats' && method === 'GET') {
+    json(res, 200, { stats: svc.platformStats() });
+    return;
+  }
+
   if (pathname === '/api/listings' && method === 'GET') {
     json(res, 200, { listings: svc.listingsDecorated() });
     return;

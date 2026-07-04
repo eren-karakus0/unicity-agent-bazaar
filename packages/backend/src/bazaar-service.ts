@@ -671,6 +671,27 @@ export class BazaarService {
     return !buyer?.chainPubkey || buyer.chainPubkey === caller.chainPubkey;
   }
 
+  /** Marketplace-wide activity totals for the hero / dashboards. */
+  platformStats(): {
+    providers: number;
+    listings: number;
+    jobsSettled: number;
+    uctSettled: number;
+    reviews: number;
+  } {
+    const listings = this.getListings();
+    const providers = new Set(listings.map((l) => l.agentNametag)).size;
+    let jobsSettled = 0;
+    let uctSettled = 0;
+    for (const job of this.jobs.values()) {
+      if (job.state === 'released') {
+        jobsSettled += 1;
+        uctSettled += job.amountUct;
+      }
+    }
+    return { providers, listings: listings.length, jobsSettled, uctSettled, reviews: this.reviews.size };
+  }
+
   /** Reviews received by a provider principal, newest first. */
   reviewsOf(principal: string): Review[] {
     const key = toPrincipal(principal);

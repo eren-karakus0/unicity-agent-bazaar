@@ -1362,3 +1362,34 @@ button {
   outline: none;
   border-color: var(--border-orange);
 }
+
+/* ---- hero activity ticker ---- */
+.ticker {
+  display: flex;
+  gap: 30px;
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metric__n {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.metric__n--accent {
+  color: var(--brand-orange);
+}
+.metric__l {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
