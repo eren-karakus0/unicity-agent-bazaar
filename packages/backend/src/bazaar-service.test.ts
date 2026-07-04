@@ -275,3 +275,33 @@ describe('BazaarService — reviews, favorites, trending', () => {
     expect(svc.listingsDecorated()[0]?.jobsCompleted).toBe(1);
   });
 });
+
+describe('BazaarService — persistence', () => {
+  it('round-trips full state through snapshot/restore', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+    svc.postReview({ jobId: hire.job.jobId, stars: 5, text: 'top' }, buyer);
+    svc.toggleFavorite(listing.id, buyer);
+
+    const snap = JSON.parse(JSON.stringify(svc.snapshot())); // prove it's JSON-safe
+
+    const fresh = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    fresh.restore(snap);
+
+    expect(fresh.getListings().map((l) => l.id)).toContain(listing.id);
+    expect(fresh.getJob(hire.job.jobId)?.job.state).toBe('released');
+    expect(fresh.getJob(hire.job.jobId)?.review?.stars).toBe(5);
+    expect(fresh.reviewsOf('@scout')).toHaveLength(1);
+    expect(fresh.reputationOf('@scout').avgRating).toBe(5);
+    expect(fresh.favoriteIdsOf(buyer)).toContain(listing.id);
+    expect(fresh.profileOf('@scout').stats.earnedUct).toBe(10);
+    // buyer authorization survives restore (jobParties persisted)
+    const stranger: Identity = { chainPubkey: `02${'e'.repeat(64)}` };
+    expect(fresh.reviewableByBuyer(hire.job.jobId, stranger)).toBe(false);
+  });
+});

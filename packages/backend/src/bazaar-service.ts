@@ -81,6 +81,25 @@ export function toPrincipal(s: string): string {
   return `@${t.replace(/^@/, '')}`;
 }
 
+/** A serializable snapshot of the whole marketplace state (for file persistence). */
+export interface BazaarSnapshot {
+  v: 1;
+  listings: [string, Listing][];
+  jobs: [string, EscrowJob][];
+  inputs: [string, unknown][];
+  results: [string, ServiceResult][];
+  settlements: [string, Settlement][];
+  reputations: [string, Reputation][];
+  listingProviders: [string, Identity][];
+  jobParties: [string, { buyer: Identity; provider: Identity }][];
+  escrowIndex: [string, string][];
+  seenFunding: string[];
+  reviews: [string, Review][];
+  reviewsByProvider: [string, string[]][];
+  favorites: [string, string[]][];
+  favoriteCounts: [string, number][];
+}
+
 /** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
 export interface BazaarAgent {
   readonly nametag: string;
@@ -680,5 +699,53 @@ export class BazaarService {
     while (this.inFlightPayouts.size > 0) {
       await Promise.all([...this.inFlightPayouts]);
     }
+  }
+
+  // ---- persistence ----
+
+  /** A plain, JSON-serializable snapshot of all in-memory state. */
+  snapshot(): BazaarSnapshot {
+    return {
+      v: 1,
+      listings: [...this.listings],
+      jobs: [...this.jobs],
+      inputs: [...this.inputs],
+      results: [...this.results],
+      settlements: [...this.settlements],
+      reputations: [...this.reputations],
+      listingProviders: [...this.listingProviders],
+      jobParties: [...this.jobParties],
+      escrowIndex: [...this.escrowIndex],
+      seenFunding: [...this.seenFunding],
+      reviews: [...this.reviews],
+      reviewsByProvider: [...this.reviewsByProvider],
+      favorites: [...this.favorites].map(([k, set]) => [k, [...set]] as [string, string[]]),
+      favoriteCounts: [...this.favoriteCounts],
+    };
+  }
+
+  /** Rehydrate state from a snapshot (replaces current state). */
+  restore(snap: BazaarSnapshot): void {
+    if (!snap || snap.v !== 1) return;
+    const fill = <K, V>(map: Map<K, V>, entries: [K, V][]) => {
+      map.clear();
+      for (const [k, v] of entries) map.set(k, v);
+    };
+    fill(this.listings, snap.listings);
+    fill(this.jobs, snap.jobs);
+    fill(this.inputs, snap.inputs);
+    fill(this.results, snap.results);
+    fill(this.settlements, snap.settlements);
+    fill(this.reputations, snap.reputations);
+    fill(this.listingProviders, snap.listingProviders);
+    fill(this.jobParties, snap.jobParties);
+    fill(this.escrowIndex, snap.escrowIndex);
+    fill(this.reviews, snap.reviews);
+    fill(this.reviewsByProvider, snap.reviewsByProvider);
+    fill(this.favoriteCounts, snap.favoriteCounts);
+    this.seenFunding.clear();
+    for (const k of snap.seenFunding) this.seenFunding.add(k);
+    this.favorites.clear();
+    for (const [k, ids] of snap.favorites) this.favorites.set(k, new Set(ids));
   }
 }

@@ -19,9 +19,10 @@ import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
-import { BazaarService } from './bazaar-service.js';
+import { BazaarService, type BazaarSnapshot } from './bazaar-service.js';
 import { AuthService, principalOf, type Identity } from './auth.js';
 import { createWebhookInvoker } from './webhook-client.js';
+import { loadSnapshot, saveSnapshot } from './persist.js';
 
 const env = loadEnv();
 const log = createLogger('backend');
@@ -52,6 +53,8 @@ const escrowAgent = new SphereAgent({
 let service: BazaarService | null = null;
 let ready = false;
 
+const snapshotFile = path.join(env.dataRoot, 'bazaar-state.json');
+
 async function boot(): Promise<void> {
   await escrowAgent.start();
   service = new BazaarService({
@@ -60,6 +63,21 @@ async function boot(): Promise<void> {
     autoReleaseMs: env.autoReleaseMs,
     logger: createLogger('bazaar'),
   });
+
+  // Restore prior marketplace state, then persist periodically + on shutdown.
+  const restored = loadSnapshot<BazaarSnapshot>(snapshotFile);
+  if (restored) {
+    service.restore(restored);
+    log.info(`restored marketplace state (${restored.listings?.length ?? 0} listings, ${restored.jobs?.length ?? 0} jobs)`);
+  }
+  const svcRef = service;
+  setInterval(() => saveSnapshot(snapshotFile, svcRef.snapshot()), 10_000);
+  const persistAndExit = () => {
+    saveSnapshot(snapshotFile, svcRef.snapshot());
+    process.exit(0);
+  };
+  process.once('SIGTERM', persistAndExit);
+  process.once('SIGINT', persistAndExit);
 
   // Escrow funding: buyers send UCT to the escrow wallet with the escrowRef as
   // the memo. Wallet-api rails deliver in the background and every delivery
