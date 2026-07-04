@@ -14,8 +14,12 @@ import {
   type ServiceInvocation,
   type ServiceResult,
 } from '@bazaar/core';
+import { principalOf, type Identity } from './auth.js';
 import { Logger, createLogger } from './logger.js';
 import type { Invoker } from './webhook-client.js';
+
+/** A publish request from an authenticated provider — the server assigns the owner. */
+export type PublishInput = Omit<ListingInput, 'agentNametag'>;
 
 /** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
 export interface BazaarAgent {
@@ -80,6 +84,10 @@ export class BazaarService {
   private readonly results = new Map<string, ServiceResult>();
   private readonly reputations = new Map<string, Reputation>();
   private readonly settlements = new Map<string, Settlement>();
+  /** listingId -> the authenticated provider who published it. */
+  private readonly listingProviders = new Map<string, Identity>();
+  /** jobId -> the proven identities on both sides (drives spoof-proof payout). */
+  private readonly jobParties = new Map<string, { buyer: Identity; provider: Identity }>();
   /** escrowRef -> jobId, for matching an incoming funding memo to its job. */
   private readonly escrowIndex = new Map<string, string>();
   private readonly seenFunding = new Set<string>();
@@ -98,13 +106,16 @@ export class BazaarService {
 
   // ---- registry ----
 
-  publishListing(input: ListingInput): Listing {
-    const listing = makeListing(input); // validates; throws on bad input
+  /** Publish a listing owned by an authenticated provider (its @nametag = the owner's). */
+  publishListing(input: PublishInput, owner: Identity): Listing {
+    const agentNametag = principalOf(owner);
+    const listing = makeListing({ ...input, agentNametag }); // validates; throws on bad input
     this.listings.set(listing.id, listing);
-    if (!this.reputations.has(listing.agentNametag)) {
-      this.reputations.set(listing.agentNametag, newReputation(listing.agentNametag));
+    this.listingProviders.set(listing.id, owner);
+    if (!this.reputations.has(agentNametag)) {
+      this.reputations.set(agentNametag, newReputation(agentNametag));
     }
-    this.log.info(`listing published: ${listing.slug} — ${listing.priceUct} UCT`);
+    this.log.info(`listing published: ${listing.slug} — ${listing.priceUct} UCT by ${agentNametag}`);
     return listing;
   }
 
@@ -114,22 +125,32 @@ export class BazaarService {
   getListing(id: string): Listing | undefined {
     return this.listings.get(id);
   }
+  listingOwner(id: string): Identity | undefined {
+    return this.listingProviders.get(id);
+  }
 
   // ---- hire + funding ----
 
   /** Open an escrow for a listing and return the buyer's payment instructions. */
-  hire(input: { listingId: string; buyerNametag: string; input?: unknown }): HireResult {
+  hire(input: { listingId: string; buyer: Identity; input?: unknown }): HireResult {
     const listing = this.listings.get(input.listingId);
     if (!listing || !listing.active) throw new Error('unknown or inactive listing');
-    const buyer = `@${(input.buyerNametag ?? '').trim().replace(/^@/, '')}`;
-    if (buyer.length < 3) throw new Error('a buyerNametag is required');
+    const buyerPrincipal = principalOf(input.buyer);
+    const provider = this.listingProviders.get(listing.id) ?? {
+      chainPubkey: '',
+      nametag: listing.agentNametag.replace(/^@/, ''),
+    };
+    if (provider.chainPubkey && provider.chainPubkey === input.buyer.chainPubkey) {
+      throw new Error('you cannot hire your own listing');
+    }
     const job = openEscrow({
       listingId: listing.id,
-      buyerNametag: buyer,
+      buyerNametag: buyerPrincipal,
       providerNametag: listing.agentNametag,
       amountUct: listing.priceUct,
     });
     this.jobs.set(job.jobId, job);
+    this.jobParties.set(job.jobId, { buyer: input.buyer, provider });
     this.escrowIndex.set(job.escrowRef, job.jobId);
     if (input.input !== undefined) this.inputs.set(job.jobId, input.input);
     this.log.info(`hired ${listing.slug}: job ${job.jobId} quoted at ${job.amountUct} UCT`);
@@ -216,41 +237,67 @@ export class BazaarService {
   // ---- resolution ----
 
   /** Buyer accepts a delivered job → release funds to the provider. */
-  acceptJob(jobId: string): EscrowJob {
-    const job = this.jobs.get(jobId);
-    if (!job) throw new Error('unknown job');
-    const released = applyEscrowEvent(job, 'accept'); // throws unless delivered
-    this.jobs.set(jobId, released);
-    this.enqueueSettlement(released, released.providerNametag, 'release');
-    return released;
+  acceptJob(jobId: string, caller: Identity): EscrowJob {
+    const job = this.requireJob(jobId);
+    this.assertBuyer(job, caller);
+    return this.release(job);
   }
 
   /** Buyer disputes a delivered job → hold, pending resolution. */
-  disputeJob(jobId: string): EscrowJob {
-    const job = this.jobs.get(jobId);
-    if (!job) throw new Error('unknown job');
+  disputeJob(jobId: string, caller: Identity): EscrowJob {
+    const job = this.requireJob(jobId);
+    this.assertBuyer(job, caller);
     const disputed = applyEscrowEvent(job, 'dispute');
     this.jobs.set(jobId, disputed);
     this.log.warn(`job ${jobId} disputed by ${disputed.buyerNametag}`);
     return disputed;
   }
 
-  /** Resolve a dispute either way (operator action; auth deferred to a later phase). */
+  /** Resolve a dispute either way (operator action — gated at the transport). */
   resolveDispute(jobId: string, outcome: SettlementKind): EscrowJob {
-    const job = this.jobs.get(jobId);
-    if (!job) throw new Error('unknown job');
+    const job = this.requireJob(jobId);
     const resolved = applyEscrowEvent(job, outcome === 'release' ? 'resolve_release' : 'resolve_refund');
     this.jobs.set(jobId, resolved);
-    const recipient = outcome === 'release' ? resolved.providerNametag : resolved.buyerNametag;
-    this.enqueueSettlement(resolved, recipient, outcome);
+    this.enqueueSettlement(resolved, outcome);
     return resolved;
+  }
+
+  /** Move a delivered job to released and pay the provider. */
+  private release(job: EscrowJob): EscrowJob {
+    const released = applyEscrowEvent(job, 'accept'); // throws unless delivered
+    this.jobs.set(job.jobId, released);
+    this.enqueueSettlement(released, 'release');
+    return released;
   }
 
   private refundJob(job: EscrowJob, reason: string): void {
     const refunded = applyEscrowEvent(job, 'refund');
     this.jobs.set(job.jobId, refunded);
     this.log.warn(`job ${job.jobId} refunded: ${reason}`);
-    this.enqueueSettlement(refunded, refunded.buyerNametag, 'refund');
+    this.enqueueSettlement(refunded, 'refund');
+  }
+
+  private requireJob(jobId: string): EscrowJob {
+    const job = this.jobs.get(jobId);
+    if (!job) throw new Error('unknown job');
+    return job;
+  }
+
+  /** Only the job's proven buyer may accept or dispute it. */
+  private assertBuyer(job: EscrowJob, caller: Identity): void {
+    const buyer = this.jobParties.get(job.jobId)?.buyer;
+    if (buyer?.chainPubkey && caller.chainPubkey !== buyer.chainPubkey) {
+      throw new Error('only the buyer can act on this job');
+    }
+  }
+
+  /** Route a payout to the counterparty's PROVEN wallet key (nametag-spoof-proof). */
+  private settlementRecipient(job: EscrowJob, kind: SettlementKind): string {
+    const parties = this.jobParties.get(job.jobId);
+    const party = kind === 'release' ? parties?.provider : parties?.buyer;
+    const pk = party?.chainPubkey?.trim();
+    if (pk) return pk;
+    return kind === 'release' ? job.providerNametag : job.buyerNametag;
   }
 
   /** Release any delivered jobs whose acceptance window has elapsed. */
@@ -258,7 +305,7 @@ export class BazaarService {
     for (const job of this.jobs.values()) {
       if (isAutoReleasable(job, this.autoReleaseMs, now)) {
         try {
-          this.acceptJob(job.jobId);
+          this.release(job);
           this.log.info(`job ${job.jobId} auto-released after the acceptance window`);
         } catch (e) {
           this.log.warn(`auto-release failed for ${job.jobId}`, e instanceof Error ? e.message : e);
@@ -269,7 +316,8 @@ export class BazaarService {
 
   // ---- settlement (serialized on-chain payout) ----
 
-  private enqueueSettlement(job: EscrowJob, recipient: string, kind: SettlementKind): void {
+  private enqueueSettlement(job: EscrowJob, kind: SettlementKind): void {
+    const recipient = this.settlementRecipient(job, kind);
     const memo = kind === 'release' ? 'bazaar-release' : 'bazaar-refund';
     this.settlements.set(job.jobId, { status: 'pending', kind, amountUct: job.amountUct, recipient, at: Date.now() });
     const run = this.payLock.then(async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './lib/api';
+import { useAuth, displayName } from './lib/auth';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 
@@ -51,6 +52,7 @@ export function App() {
             <button className={`navlink${view === 'publish' ? ' navlink--on' : ''}`} onClick={() => go('publish')}>
               publish agent
             </button>
+            <AccountChip />
           </nav>
         </div>
       </header>
@@ -64,5 +66,33 @@ export function App() {
         <span>escrow-settled on testnet2 · SDK-only · $0</span>
       </footer>
     </>
+  );
+}
+
+function AccountChip() {
+  const { session, phase, signIn, signOut } = useAuth();
+
+  if (phase === 'authenticated' && session) {
+    return (
+      <div className="acct">
+        <span className="acct__id" title={session.chainPubkey}>
+          <span className="acct__dot" />
+          {displayName(session)}
+        </span>
+        <button className="acct__out" onClick={() => void signOut()}>
+          sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className="btn btn--primary btn--sm"
+      disabled={phase === 'signing-in'}
+      onClick={() => void signIn()}
+    >
+      {phase === 'signing-in' ? 'signing in…' : 'Connect wallet'}
+    </button>
   );
 }

@@ -15,14 +15,26 @@
  */
 import http from 'node:http';
 import path from 'node:path';
+import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
 import { BazaarService } from './bazaar-service.js';
+import { AuthService, type Identity } from './auth.js';
 import { createWebhookInvoker } from './webhook-client.js';
 
 const env = loadEnv();
 const log = createLogger('backend');
+
+const auth = new AuthService({
+  sessionSecret: env.auth.sessionSecret,
+  sessionTtlMs: env.auth.sessionTtlMs,
+  verify: verifySignedMessage,
+  logger: createLogger('auth'),
+});
+if (env.auth.secretIsEphemeral) {
+  log.warn('BAZAAR_SESSION_SECRET is unset — using a random per-boot secret; logins reset on restart.');
+}
 
 const escrowAgent = new SphereAgent({
   name: 'escrow',
@@ -116,6 +128,13 @@ function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
 }
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
+/** The proven identity behind a request, from its `Authorization: Bearer <token>`. */
+function identityOf(req: http.IncomingMessage): Identity | null {
+  const header = req.headers['authorization'];
+  if (!header || !header.startsWith('Bearer ')) return null;
+  return auth.verifySession(header.slice('Bearer '.length).trim());
+}
+
 const server = http.createServer((req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') {
@@ -129,6 +148,41 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/api/health') {
     json(res, 200, { ok: true, ready, escrow: ready ? `@${escrowAgent.nametag}` : null });
+    return;
+  }
+
+  // ---- auth (available even while the bazaar is still waking up) ----
+  if (pathname === '/api/auth/challenge' && method === 'POST') {
+    void readJson(req).then((body) => {
+      try {
+        json(res, 200, auth.issueChallenge(str(body.chainPubkey) ?? ''));
+      } catch (e) {
+        json(res, 400, { error: e instanceof Error ? e.message : 'could not issue challenge' });
+      }
+    });
+    return;
+  }
+  if (pathname === '/api/auth/login' && method === 'POST') {
+    void readJson(req).then((body) => {
+      try {
+        json(res, 200, auth.login({
+          nonce: str(body.nonce) ?? '',
+          signature: str(body.signature) ?? '',
+          nametag: str(body.nametag),
+        }));
+      } catch (e) {
+        json(res, 401, { error: e instanceof Error ? e.message : 'login failed' });
+      }
+    });
+    return;
+  }
+  if (pathname === '/api/auth/me' && method === 'GET') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'not signed in' });
+      return;
+    }
+    json(res, 200, { identity });
     return;
   }
 
@@ -150,6 +204,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/listings' && method === 'POST') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in with your wallet to publish a listing' });
+      return;
+    }
     void readJson(req).then((body) => {
       try {
         const channelKind = str(body.channelKind) ?? 'webhook';
@@ -157,14 +216,16 @@ const server = http.createServer((req, res) => {
           channelKind === 'capsule'
             ? { kind: 'capsule' as const, ref: str(body.capsuleRef) ?? '' }
             : { kind: 'webhook' as const, url: str(body.webhookUrl) ?? '' };
-        const listing = svc.publishListing({
-          agentNametag: str(body.agentNametag) ?? '',
-          title: str(body.title) ?? '',
-          description: str(body.description) ?? '',
-          category: str(body.category) ?? 'other',
-          priceUct: Number(body.priceUct),
-          channel,
-        });
+        const listing = svc.publishListing(
+          {
+            title: str(body.title) ?? '',
+            description: str(body.description) ?? '',
+            category: str(body.category) ?? 'other',
+            priceUct: Number(body.priceUct),
+            channel,
+          },
+          identity,
+        );
         json(res, 200, { listing });
       } catch (e) {
         json(res, 400, { error: e instanceof Error ? e.message : 'could not publish listing' });
@@ -185,11 +246,16 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/hire' && method === 'POST') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in with your wallet to hire an agent' });
+      return;
+    }
     void readJson(req).then((body) => {
       try {
         const out = svc.hire({
           listingId: str(body.listingId) ?? '',
-          buyerNametag: str(body.buyerNametag) ?? '',
+          buyer: identity,
           input: body.input,
         });
         json(res, 200, out);
@@ -214,11 +280,26 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (action && method === 'POST') {
+      const identity = identityOf(req);
+      if (!identity) {
+        json(res, 401, { error: 'sign in with your wallet to act on a job' });
+        return;
+      }
       void readJson(req).then((body) => {
         try {
-          if (action === 'accept') json(res, 200, { job: svc.acceptJob(jobId) });
-          else if (action === 'dispute') json(res, 200, { job: svc.disputeJob(jobId) });
-          else json(res, 200, { job: svc.resolveDispute(jobId, str(body.outcome) === 'refund' ? 'refund' : 'release') });
+          if (action === 'accept') {
+            json(res, 200, { job: svc.acceptJob(jobId, identity) });
+          } else if (action === 'dispute') {
+            json(res, 200, { job: svc.disputeJob(jobId, identity) });
+          } else {
+            if (!env.auth.operators.includes(identity.chainPubkey)) {
+              json(res, 403, { error: 'only a bazaar operator can resolve disputes' });
+              return;
+            }
+            json(res, 200, {
+              job: svc.resolveDispute(jobId, str(body.outcome) === 'refund' ? 'refund' : 'release'),
+            });
+          }
         } catch (e) {
           json(res, 400, { error: e instanceof Error ? e.message : 'action failed' });
         }

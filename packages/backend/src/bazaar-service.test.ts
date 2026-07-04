@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { DeliveryChannel, ListingInput, ServiceInvocation, ServiceResult } from '@bazaar/core';
-import { BazaarService, type BazaarAgent } from './bazaar-service.js';
+import type { DeliveryChannel, ServiceInvocation, ServiceResult } from '@bazaar/core';
+import { BazaarService, type BazaarAgent, type PublishInput } from './bazaar-service.js';
+import type { Identity } from './auth.js';
 import type { Invoker } from './webhook-client.js';
+
+const provider: Identity = { chainPubkey: `02${'a'.repeat(64)}`, nametag: 'scout' };
+const buyer: Identity = { chainPubkey: `03${'b'.repeat(64)}`, nametag: 'buyer' };
 
 interface Sent {
   recipient: string;
@@ -31,8 +35,7 @@ function invoker(mode: 'ok' | 'fail'): Invoker {
       : { jobId: inv.jobId, ok: false, error: 'provider blew up' };
 }
 
-const listingInput: ListingInput = {
-  agentNametag: '@scout',
+const publishInput: PublishInput = {
   title: 'Repo risk scan',
   description: 'I scan a repo and return risk.',
   category: 'analysis',
@@ -48,14 +51,15 @@ function fund(svc: BazaarService, hire: { memo: string; amountUct: number }, ded
 describe('BazaarService — registry', () => {
   it('publishes and lists active listings', () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
-    const l = svc.publishListing(listingInput);
+    const l = svc.publishListing(publishInput, provider);
+    expect(l.agentNametag).toBe('@scout');
     expect(svc.getListings().map((x) => x.id)).toContain(l.id);
     expect(svc.getListing(l.id)?.priceUct).toBe(10);
   });
 
   it('rejects an invalid listing', () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
-    expect(() => svc.publishListing({ ...listingInput, priceUct: 0 })).toThrow(/invalid listing/);
+    expect(() => svc.publishListing({ ...publishInput, priceUct: 0 }, provider)).toThrow(/invalid listing/);
   });
 });
 
@@ -63,8 +67,8 @@ describe('BazaarService — happy path (fund → deliver → release)', () => {
   it('funds, invokes, delivers, and releases to the provider on accept', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
-    const listing = svc.publishListing(listingInput);
-    const hire = svc.hire({ listingId: listing.id, buyerNametag: '@buyer', input: { repo: 'x/y' } });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer, input: { repo: 'x/y' } });
     expect(hire.memo).toBe(hire.job.escrowRef);
     expect(hire.payTo).toBe('@bazaar-escrow');
 
@@ -76,13 +80,14 @@ describe('BazaarService — happy path (fund → deliver → release)', () => {
     expect(delivered.job.state).toBe('delivered');
     expect(delivered.result?.ok).toBe(true);
 
-    svc.acceptJob(hire.job.jobId);
+    svc.acceptJob(hire.job.jobId, buyer);
     await svc.flushPayouts();
 
     const done = svc.getJob(hire.job.jobId)!;
     expect(done.job.state).toBe('released');
     expect(done.settlement?.status).toBe('settled');
-    expect(sent).toEqual([{ recipient: '@scout', amount: 10, memo: 'bazaar-release' }]);
+    // Settlement routes to the provider's PROVEN wallet key, not a claimed nametag.
+    expect(sent).toEqual([{ recipient: provider.chainPubkey, amount: 10, memo: 'bazaar-release' }]);
     const rep = svc.reputationOf('@scout');
     expect(rep.jobsCompleted).toBe(1);
     expect(rep.volumeUct).toBe(10);
@@ -94,15 +99,15 @@ describe('BazaarService — provider failure refunds the buyer', () => {
   it('refunds when the provider fails', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('fail') });
-    const listing = svc.publishListing(listingInput);
-    const hire = svc.hire({ listingId: listing.id, buyerNametag: '@buyer' });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
     fund(svc, hire);
     await svc.flushJobs();
     await svc.flushPayouts();
 
     const job = svc.getJob(hire.job.jobId)!;
     expect(job.job.state).toBe('refunded');
-    expect(sent).toEqual([{ recipient: '@buyer', amount: 10, memo: 'bazaar-refund' }]);
+    expect(sent).toEqual([{ recipient: buyer.chainPubkey, amount: 10, memo: 'bazaar-refund' }]);
     expect(svc.reputationOf('@scout').jobsCompleted).toBe(0);
     expect(svc.reputationOf('@scout').successRate).toBe(0);
   });
@@ -111,7 +116,7 @@ describe('BazaarService — provider failure refunds the buyer', () => {
 describe('BazaarService — funding rules', () => {
   it('ignores a wrong memo, an underfunded amount, and a duplicate dedupKey', async () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
-    const hire = svc.hire({ listingId: svc.publishListing(listingInput).id, buyerNametag: '@buyer' });
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
 
     expect(svc.creditFunding({ dedupKey: 'x', amountBase: '1000', memo: 'nope' })).toBeNull();
     expect(svc.creditFunding({ dedupKey: 'y', amountBase: '500', memo: hire.memo })).toBeNull(); // 5 < 10 UCT
@@ -128,7 +133,7 @@ describe('BazaarService — auto-release', () => {
   it('auto-releases a delivered job after its window', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok'), autoReleaseMs: 1000 });
-    const hire = svc.hire({ listingId: svc.publishListing(listingInput).id, buyerNametag: '@buyer' });
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
     fund(svc, hire);
     await svc.flushJobs();
 
@@ -146,20 +151,36 @@ describe('BazaarService — dispute', () => {
   it('disputes a delivered job and resolves it as a refund', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
-    const hire = svc.hire({ listingId: svc.publishListing(listingInput).id, buyerNametag: '@buyer' });
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
     fund(svc, hire);
     await svc.flushJobs();
 
-    expect(svc.disputeJob(hire.job.jobId).state).toBe('disputed');
+    expect(svc.disputeJob(hire.job.jobId, buyer).state).toBe('disputed');
     svc.resolveDispute(hire.job.jobId, 'refund');
     await svc.flushPayouts();
     expect(svc.getJob(hire.job.jobId)!.job.state).toBe('refunded');
-    expect(sent).toEqual([{ recipient: '@buyer', amount: 10, memo: 'bazaar-refund' }]);
+    expect(sent).toEqual([{ recipient: buyer.chainPubkey, amount: 10, memo: 'bazaar-refund' }]);
   });
 
   it('cannot accept a job that was never delivered', () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
-    const hire = svc.hire({ listingId: svc.publishListing(listingInput).id, buyerNametag: '@buyer' });
-    expect(() => svc.acceptJob(hire.job.jobId)).toThrow(/illegal/);
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
+    expect(() => svc.acceptJob(hire.job.jobId, buyer)).toThrow(/illegal/);
+  });
+
+  it('rejects accept/dispute from someone who is not the buyer', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    const stranger: Identity = { chainPubkey: `02${'c'.repeat(64)}` };
+    expect(() => svc.acceptJob(hire.job.jobId, stranger)).toThrow(/only the buyer/);
+    expect(() => svc.disputeJob(hire.job.jobId, stranger)).toThrow(/only the buyer/);
+  });
+
+  it('forbids hiring your own listing', () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const listing = svc.publishListing(publishInput, provider);
+    expect(() => svc.hire({ listingId: listing.id, buyer: provider })).toThrow(/your own listing/);
   });
 });

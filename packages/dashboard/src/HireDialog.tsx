@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type EscrowState, type HireResult, type JobView, type Listing } from './lib/api';
+import { useAuth, displayName } from './lib/auth';
 
 const STEPS: { key: EscrowState; label: string }[] = [
   { key: 'quoted', label: 'quoted' },
@@ -9,12 +10,18 @@ const STEPS: { key: EscrowState; label: string }[] = [
 ];
 const ORDER: EscrowState[] = ['quoted', 'funded', 'delivered', 'released'];
 
+/** whole UCT → base-unit integer string, without floating-point error. */
+function toBaseUnits(amountUct: number, decimals: number): string {
+  return (BigInt(Math.trunc(amountUct)) * 10n ** BigInt(decimals)).toString();
+}
+
 export function HireDialog({ listing, onClose }: { listing: Listing; onClose: () => void }) {
-  const [buyer, setBuyer] = useState('');
+  const { session, phase, signIn, wallet } = useAuth();
   const [input, setInput] = useState('');
   const [hire, setHire] = useState<HireResult | null>(null);
   const [jobv, setJobv] = useState<JobView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -30,7 +37,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
     setBusy(true);
     try {
       const parsed = input.trim() ? { text: input } : {};
-      const h = await api.hire(listing.id, buyer, parsed);
+      const h = await api.hire(listing.id, parsed);
       setHire(h);
       const tick = () => api.job(h.job.jobId).then(setJobv).catch(() => {});
       tick();
@@ -39,6 +46,24 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
       setErr(e instanceof Error ? e.message : 'could not open escrow');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const payWithWallet = async () => {
+    if (!hire) return;
+    setErr(null);
+    setPaying(true);
+    try {
+      await wallet.deposit({
+        to: hire.payTo,
+        amountBase: toBaseUnits(hire.amountUct, hire.decimals),
+        coinId: hire.coinId,
+        memo: hire.memo,
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'wallet payment was cancelled');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -57,7 +82,23 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
           </button>
         </div>
         <div className="dialog__bd">
-          {!hire ? (
+          {phase !== 'authenticated' ? (
+            <div className="gate">
+              <div className="card__title" style={{ marginBottom: 4 }}>
+                {listing.title}
+              </div>
+              <div className="card__agent" style={{ marginBottom: 16 }}>
+                {listing.agentNametag} · {listing.priceUct} UCT
+              </div>
+              <p className="gate__p">
+                Connect your wallet to hire this agent. Your UCT is held in on-chain escrow and only released
+                when the work is delivered.
+              </p>
+              <button className="btn btn--primary" disabled={phase === 'signing-in'} onClick={() => void signIn()}>
+                {phase === 'signing-in' ? 'signing in…' : 'Connect wallet to hire'}
+              </button>
+            </div>
+          ) : !hire ? (
             <>
               <div className="card__title" style={{ marginBottom: 4 }}>
                 {listing.title}
@@ -67,8 +108,11 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
               </div>
               {err && <div className="formmsg formmsg--bad">{err}</div>}
               <div className="field">
-                <label>your @nametag</label>
-                <input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="@alice" />
+                <label>hiring as</label>
+                <div className="whoami">
+                  <span className="acct__dot" />
+                  {displayName(session)}
+                </div>
               </div>
               <div className="field">
                 <label>task input</label>
@@ -80,11 +124,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                 <div className="hint">sent to the agent as &#123; text &#125; once the escrow is funded</div>
               </div>
               <div className="dialog__actions">
-                <button
-                  className="btn btn--primary"
-                  disabled={busy || buyer.trim().length < 2}
-                  onClick={openEscrow}
-                >
+                <button className="btn btn--primary" disabled={busy} onClick={openEscrow}>
                   {busy ? 'opening…' : `Open escrow · ${listing.priceUct} UCT`}
                 </button>
                 <button className="btn btn--ghost" onClick={onClose}>
@@ -114,10 +154,20 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                   </b>
                 </div>
               </div>
-              <div className="hint" style={{ marginTop: 8 }}>
-                Send exactly {hire.amountUct} UCT from your wallet to the escrow agent with the memo above — it&rsquo;s
-                detected automatically.
-              </div>
+
+              {state === 'quoted' && (
+                <>
+                  <div className="dialog__actions" style={{ marginTop: 14 }}>
+                    <button className="btn btn--primary" disabled={paying} onClick={payWithWallet}>
+                      {paying ? 'confirm in wallet…' : `Pay ${hire.amountUct} UCT with wallet`}
+                    </button>
+                  </div>
+                  <div className="hint" style={{ marginTop: 8 }}>
+                    One click opens your wallet to approve the transfer — the memo is attached automatically. Or
+                    send {hire.amountUct} UCT to {hire.payTo} manually with the memo above.
+                  </div>
+                </>
+              )}
 
               <div className="stepper">
                 {STEPS.map((s, i) => {

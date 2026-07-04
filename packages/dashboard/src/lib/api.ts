@@ -89,15 +89,35 @@ export interface DepositInfo {
   symbol: string;
 }
 
+export interface Identity {
+  chainPubkey: string;
+  nametag?: string;
+}
+
+export interface Challenge {
+  nonce: string;
+  message: string;
+  expiresAt: number;
+}
+
+// ---- auth token (attached to every request once signed in) ----
+let authToken: string | null = null;
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+function authHeaders(): Record<string, string> {
+  return authToken ? { authorization: `Bearer ${authToken}` } : {};
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error((await safeErr(res)) ?? `GET ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error((await safeErr(res)) ?? `POST ${path} → ${res.status}`);
@@ -117,17 +137,22 @@ export const api = {
   depositInfo: () => get<DepositInfo>('/api/deposit-info'),
   listings: () => get<{ listings: Listing[] }>('/api/listings').then((r) => r.listings),
   listing: (id: string) => get<{ listing: Listing }>(`/api/listings/${encodeURIComponent(id)}`).then((r) => r.listing),
+
+  // ---- auth ----
+  challenge: (chainPubkey: string) => post<Challenge>('/api/auth/challenge', { chainPubkey }),
+  login: (input: { nonce: string; signature: string; nametag?: string }) =>
+    post<{ token: string; identity: Identity }>('/api/auth/login', input),
+  me: () => get<{ identity: Identity }>('/api/auth/me').then((r) => r.identity),
+
+  // ---- authenticated actions (server derives owner/buyer from the token) ----
   publish: (input: {
-    agentNametag: string;
     title: string;
     description: string;
     category: Category;
     priceUct: number;
     webhookUrl: string;
-  }) =>
-    post<{ listing: Listing }>('/api/listings', { ...input, channelKind: 'webhook' }).then((r) => r.listing),
-  hire: (listingId: string, buyerNametag: string, input: unknown) =>
-    post<HireResult>('/api/hire', { listingId, buyerNametag, input }),
+  }) => post<{ listing: Listing }>('/api/listings', { ...input, channelKind: 'webhook' }).then((r) => r.listing),
+  hire: (listingId: string, input: unknown) => post<HireResult>('/api/hire', { listingId, input }),
   job: (jobId: string) => get<JobView>(`/api/jobs/${encodeURIComponent(jobId)}`),
   accept: (jobId: string) => post<{ job: EscrowJob }>(`/api/jobs/${encodeURIComponent(jobId)}/accept`, {}),
   dispute: (jobId: string) => post<{ job: EscrowJob }>(`/api/jobs/${encodeURIComponent(jobId)}/dispute`, {}),

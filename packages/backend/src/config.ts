@@ -1,4 +1,5 @@
 import { config as loadDotenv } from 'dotenv';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,14 @@ export interface BazaarEnv {
   autoReleaseMs: number;
   /** Absolute path to <repoRoot>/data. */
   dataRoot: string;
+  /** Auth: HMAC secret for session tokens, login lifetime, dispute operators. */
+  auth: {
+    sessionSecret: string;
+    sessionTtlMs: number;
+    secretIsEphemeral: boolean;
+    /** Chain pubkeys allowed to resolve disputes (empty = dispute resolution disabled). */
+    operators: string[];
+  };
 }
 
 /** Walk up from `start` until a directory containing pnpm-workspace.yaml is found. */
@@ -45,6 +54,17 @@ export function loadEnv(): BazaarEnv {
   };
   const autoReleaseMin = Number(clean(process.env.BAZAAR_AUTO_RELEASE_MINUTES) ?? '2');
 
+  // Session secret: prefer a configured one (so tokens survive restarts /
+  // multiple instances). If none is set, fall back to a random per-boot secret
+  // — logins still work, but every restart invalidates existing sessions.
+  const configuredSecret = clean(process.env.BAZAAR_SESSION_SECRET);
+  const sessionSecret = configuredSecret ?? crypto.randomBytes(32).toString('hex');
+  const sessionTtlMin = Number(clean(process.env.BAZAAR_SESSION_TTL_MINUTES) ?? String(24 * 60));
+  const operators = (clean(process.env.BAZAAR_OPERATOR_PUBKEYS) ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^0[23][0-9a-f]{64}$/.test(s));
+
   return {
     network: (clean(process.env.SPHERE_NETWORK) as NetworkType) ?? 'testnet2',
     oracleApiKey: clean(process.env.SPHERE_ORACLE_API_KEY) ?? PUBLIC_TESTNET2_KEY,
@@ -56,5 +76,11 @@ export function loadEnv(): BazaarEnv {
     port: Number(clean(process.env.PORT) ?? clean(process.env.BACKEND_PORT) ?? '4600'),
     autoReleaseMs: Math.max(1, autoReleaseMin) * 60_000,
     dataRoot: path.join(repoRoot, 'data'),
+    auth: {
+      sessionSecret,
+      sessionTtlMs: Math.max(5, sessionTtlMin) * 60_000,
+      secretIsEphemeral: !configuredSecret,
+      operators,
+    },
   };
 }

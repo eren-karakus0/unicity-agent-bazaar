@@ -1,8 +1,8 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { api, CATEGORIES, type Category } from './lib/api';
+import { useAuth, displayName } from './lib/auth';
 
 interface Form {
-  agentNametag: string;
   title: string;
   description: string;
   category: Category;
@@ -11,8 +11,8 @@ interface Form {
 }
 
 export function Publish() {
+  const { session, phase, signIn } = useAuth();
   const [f, setF] = useState<Form>({
-    agentNametag: '',
     title: '',
     description: '',
     category: 'analysis',
@@ -53,55 +53,74 @@ export function Publish() {
         </p>
       </section>
 
-      <form className="panel" onSubmit={submit}>
-        {msg && <div className={`formmsg ${msg.ok ? 'formmsg--ok' : 'formmsg--bad'}`}>{msg.text}</div>}
-        <div className="field">
-          <label>agent @nametag</label>
-          <input value={f.agentNametag} onChange={set('agentNametag')} placeholder="@scout-knkchn" required />
-        </div>
-        <div className="field">
-          <label>service title</label>
-          <input value={f.title} onChange={set('title')} placeholder="Text scout — quick content analysis" required />
-        </div>
-        <div className="field">
-          <label>description</label>
-          <textarea
-            value={f.description}
-            onChange={set('description')}
-            placeholder="What does your agent do, and what input does it expect?"
-            required
-          />
-        </div>
-        <div className="field field--row">
-          <div>
-            <label>category</label>
-            <select value={f.category} onChange={set('category')}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>price (UCT)</label>
-            <input type="number" min={1} value={f.priceUct} onChange={set('priceUct')} />
-          </div>
-        </div>
-        <div className="field">
-          <label>webhook URL</label>
-          <input value={f.webhookUrl} onChange={set('webhookUrl')} placeholder="https://my-agent.example.com/hook" required />
-          <div className="hint">
-            the bazaar POSTs each job here (ServiceInvocation &rarr; ServiceResult). Build it in minutes with
-            @bazaar/agent-kit.
-          </div>
-        </div>
-        <div className="dialog__actions">
-          <button className="btn btn--primary" disabled={busy} type="submit">
-            {busy ? 'publishing…' : 'Publish listing'}
+      {phase !== 'authenticated' ? (
+        <div className="panel gate">
+          <h3 className="gate__h">Sign in to publish</h3>
+          <p className="gate__p">
+            Listings are owned by the wallet that publishes them — connect yours and sign a one-time message to
+            prove it. No funds move; it just links the listing to your on-chain identity.
+          </p>
+          <button className="btn btn--primary" disabled={phase === 'signing-in'} onClick={() => void signIn()}>
+            {phase === 'signing-in' ? 'signing in…' : 'Connect wallet to publish'}
           </button>
         </div>
-      </form>
+      ) : (
+        <form className="panel" onSubmit={submit}>
+          {msg && <div className={`formmsg ${msg.ok ? 'formmsg--ok' : 'formmsg--bad'}`}>{msg.text}</div>}
+          <div className="field">
+            <label>publishing as</label>
+            <div className="whoami">
+              <span className="acct__dot" />
+              {displayName(session)}
+              {!session?.nametag && (
+                <span className="whoami__hint">— register a @nametag in your wallet for a friendlier handle</span>
+              )}
+            </div>
+          </div>
+          <div className="field">
+            <label>service title</label>
+            <input value={f.title} onChange={set('title')} placeholder="Text scout — quick content analysis" required />
+          </div>
+          <div className="field">
+            <label>description</label>
+            <textarea
+              value={f.description}
+              onChange={set('description')}
+              placeholder="What does your agent do, and what input does it expect?"
+              required
+            />
+          </div>
+          <div className="field field--row">
+            <div>
+              <label>category</label>
+              <select value={f.category} onChange={set('category')}>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>price (UCT)</label>
+              <input type="number" min={1} value={f.priceUct} onChange={set('priceUct')} />
+            </div>
+          </div>
+          <div className="field">
+            <label>webhook URL</label>
+            <input value={f.webhookUrl} onChange={set('webhookUrl')} placeholder="https://my-agent.example.com/hook" required />
+            <div className="hint">
+              the bazaar POSTs each job here (ServiceInvocation &rarr; ServiceResult). Build it in minutes with
+              @bazaar/agent-kit.
+            </div>
+          </div>
+          <div className="dialog__actions">
+            <button className="btn btn--primary" disabled={busy} type="submit">
+              {busy ? 'publishing…' : 'Publish listing'}
+            </button>
+          </div>
+        </form>
+      )}
     </>
   );
 }
