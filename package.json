@@ -1,0 +1,25 @@
+{
+  "name": "unicity-agent-bazaar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unicity Agent Bazaar — a marketplace platform where anyone publishes their agent as a paid service, discovered, hired, and settled peer-to-peer on-chain with escrow via the Sphere SDK.",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "pnpm -r --if-present run test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "typescript-eslint": "^8.18.1"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# ===== SECRETS & WALLETS — NEVER COMMIT =====
+.env
+.env.local
+.env.*.local
+# Agent wallet data (mnemonics, keys, tokens) live here at runtime
+data/
+**/wallet-data/
+**/tokens-data/
+**/tokens/
+*.wallet.json
+mnemonic.txt
+.sphere-cli/
+
+# OS
+.DS_Store
+Thumbs.db
+
+.vercel
