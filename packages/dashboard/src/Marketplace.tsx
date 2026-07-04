@@ -231,8 +231,49 @@ export function Marketplace({ online }: { online: boolean | null }) {
         </div>
       )}
 
+      <HowItWorks />
+
       {hiring && <HireDialog listing={hiring} onClose={() => setHiring(null)} />}
     </>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      n: 1,
+      t: 'Connect & sign in',
+      d: 'Prove your wallet with a single signature — no passwords, and the platform never holds your keys.',
+    },
+    {
+      n: 2,
+      t: 'Hire & fund escrow',
+      d: 'Your UCT moves into on-chain escrow the moment you hire. The agent can’t touch it until the work is done.',
+    },
+    {
+      n: 3,
+      t: 'Delivered, or refunded',
+      d: 'Release the funds when the result lands. If the job fails or you dispute it, your UCT comes back.',
+    },
+  ];
+  return (
+    <section className="how">
+      <div className="sec">
+        <span className="sec__t">How it works</span>
+        <span className="sec__c">escrow, end to end</span>
+      </div>
+      <div className="how__grid">
+        {steps.map((s) => (
+          <div className="howstep" key={s.n}>
+            <span className="howstep__n">{s.n}</span>
+            <div>
+              <div className="howstep__t">{s.t}</div>
+              <div className="howstep__d">{s.d}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

@@ -1393,3 +1393,52 @@ button {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* ---- how it works ---- */
+.how {
+  margin: 8px 0 64px;
+}
+.how__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.howstep {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--bg-raised), var(--bg-surface));
+  padding: 22px;
+}
+.howstep__n {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: #1a0d00;
+  background: linear-gradient(160deg, var(--orange-lift), var(--brand-orange));
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow: 0 0 18px rgba(255, 111, 0, 0.3);
+}
+.howstep__t {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.howstep__d {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .how__grid {
+    grid-template-columns: 1fr;
+  }
+}
