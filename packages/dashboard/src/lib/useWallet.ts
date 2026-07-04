@@ -67,6 +67,21 @@ function extractSignature(result: unknown): string {
   throw new Error('The wallet returned an unexpected sign-message response.');
 }
 
+/** base-unit integer string → a short human amount (up to 2 fractional digits). */
+function formatUnits(base: string, decimals: number): string {
+  try {
+    const n = BigInt(base);
+    const d = 10n ** BigInt(decimals);
+    const whole = n / d;
+    const frac = n % d;
+    if (frac === 0n) return whole.toString();
+    const fracStr = frac.toString().padStart(decimals, '0').slice(0, 2).replace(/0+$/, '');
+    return fracStr ? `${whole}.${fracStr}` : whole.toString();
+  } catch {
+    return '0';
+  }
+}
+
 export type WalletStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
 export interface WalletState {
@@ -77,6 +92,11 @@ export interface WalletState {
   disconnect: () => Promise<void>;
   /** Ask the wallet to sign a plaintext message (opens its approval UI); returns the hex signature. */
   signMessage: (message: string) => Promise<string>;
+  /**
+   * Read the wallet's confirmed UCT balance (human string) via the live session
+   * — does NOT open the wallet. Returns null when there is no live session yet.
+   */
+  getUctBalance: (coinId: string, decimals: number) => Promise<string | null>;
   /**
    * Ask the wallet to send a real transfer (opens its approval UI).
    * `amountBase` is a positive integer string in the coin's base units.
@@ -180,6 +200,32 @@ export function useWallet(): WalletState {
     [openClient],
   );
 
+  const getUctBalance = useCallback(
+    async (coinId: string, decimals: number): Promise<string | null> => {
+      const client = clientRef.current;
+      if (!client?.isConnected) return null; // no live session — never force a popup for a read
+      // Bridges to sphere.payments.getAssets(coinId) — the same Asset shape the
+      // backend sums (symbol / coinId / confirmedAmount / totalAmount, base units).
+      const assets = (await client.query('sphere_getAssets', { coinId })) as {
+        symbol?: string;
+        coinId?: string;
+        confirmedAmount?: string;
+        totalAmount?: string;
+      }[];
+      let total = 0n;
+      for (const a of assets ?? []) {
+        if (a.symbol !== 'UCT' && a.coinId !== coinId) continue;
+        try {
+          total += BigInt(a.confirmedAmount || a.totalAmount || '0');
+        } catch {
+          /* ignore a malformed row */
+        }
+      }
+      return formatUnits(total.toString(), decimals);
+    },
+    [],
+  );
+
   const deposit = useCallback(
     async (params: { to: string; amountBase: string; coinId: string; memo?: string }) => {
       const client = await openClient();
@@ -218,5 +264,5 @@ export function useWallet(): WalletState {
     setStatus('idle');
   }, []);
 
-  return { status, identity, error, connect, disconnect, signMessage, deposit };
+  return { status, identity, error, connect, disconnect, signMessage, getUctBalance, deposit };
 }

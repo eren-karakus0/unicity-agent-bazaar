@@ -16,7 +16,7 @@ function toBaseUnits(amountUct: number, decimals: number): string {
 }
 
 export function HireDialog({ listing, onClose }: { listing: Listing; onClose: () => void }) {
-  const { session, phase, signIn, wallet } = useAuth();
+  const { session, phase, signIn, wallet, refreshBalance } = useAuth();
   const [input, setInput] = useState('');
   const [hire, setHire] = useState<HireResult | null>(null);
   const [jobv, setJobv] = useState<JobView | null>(null);
@@ -61,6 +61,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
         coinId: hire.coinId,
         memo: hire.memo,
       });
+      refreshBalance(); // funds left the wallet — reflect the new balance
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'wallet payment was cancelled');
     } finally {

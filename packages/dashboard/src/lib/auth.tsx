@@ -30,6 +30,10 @@ export interface AuthContextValue {
   phase: AuthPhase;
   walletStatus: WalletStatus;
   error: string | null;
+  /** The wallet's confirmed UCT balance (human string), or null if unknown. */
+  balance: string | null;
+  /** Re-read the wallet balance (no-op without a live wallet session). */
+  refreshBalance: () => void;
   /** Connect the wallet (if needed) and complete Sign-In-With-Wallet. */
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -45,7 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Identity | null>(null);
   const [phase, setPhase] = useState<AuthPhase>('anonymous');
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
   const restored = useRef(false);
+
+  const refreshBalance = useCallback(() => {
+    void (async () => {
+      try {
+        const info = await api.depositInfo();
+        const bal = await wallet.getUctBalance(info.coinId, info.decimals);
+        if (bal !== null) setBalance(bal);
+      } catch {
+        /* wallet locked / no permission / offline — keep the last known value */
+      }
+    })();
+  }, [wallet]);
 
   // Restore a stored session on load. We decode the token locally so the user
   // stays signed in INSTANTLY across refreshes — even while the backend is
@@ -95,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(proven);
       setPhase('authenticated');
       toast(`Signed in as ${proven.nametag ? `@${proven.nametag}` : 'your wallet'}`, 'ok');
+      refreshBalance(); // we have a live wallet session right after sign-in
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'sign-in failed';
       setError(msg);
@@ -108,12 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     setSession(null);
     setPhase('anonymous');
+    setBalance(null);
     await wallet.disconnect();
   }, [wallet]);
 
   return (
     <AuthContext.Provider
-      value={{ session, phase, walletStatus: wallet.status, error, signIn, signOut, wallet }}
+      value={{ session, phase, walletStatus: wallet.status, error, balance, refreshBalance, signIn, signOut, wallet }}
     >
       {children}
     </AuthContext.Provider>

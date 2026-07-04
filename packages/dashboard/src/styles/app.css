@@ -771,6 +771,22 @@ button {
   font-size: 11px;
 }
 
+.acct__bal {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.acct__bal em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
 .acct__id {
   cursor: pointer;
   transition: 0.16s;

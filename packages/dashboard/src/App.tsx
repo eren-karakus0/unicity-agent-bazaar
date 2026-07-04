@@ -108,11 +108,16 @@ export function App() {
 }
 
 function AccountChip({ active }: { active: boolean }) {
-  const { session, phase, signIn, signOut } = useAuth();
+  const { session, phase, balance, signIn, signOut } = useAuth();
 
   if (phase === 'authenticated' && session) {
     return (
       <div className="acct">
+        {balance !== null && (
+          <span className="acct__bal" title="your confirmed UCT balance">
+            {balance} <em>UCT</em>
+          </span>
+        )}
         <button
           className={`acct__id${active ? ' acct__id--on' : ''}`}
           title={session.chainPubkey}
