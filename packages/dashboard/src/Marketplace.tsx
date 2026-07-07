@@ -335,7 +335,14 @@ function ListingCard({
         </span>
       </div>
       <div>
-        <div className="card__title">{listing.title}</div>
+        <div className="card__title">
+          {listing.title}
+          {listing.verified && (
+            <span className="vbadge" title="Provider endpoint verified reachable">
+              ✓ verified
+            </span>
+          )}
+        </div>
         <button
           className="card__agent card__agent--link"
           onClick={() => go(`/agent/${encodeURIComponent(listing.agentNametag)}`)}

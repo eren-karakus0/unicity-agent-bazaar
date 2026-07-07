@@ -25,7 +25,7 @@ import {
 import crypto from 'node:crypto';
 import { principalOf, type Identity } from './auth.js';
 import { Logger, createLogger } from './logger.js';
-import type { Invoker } from './webhook-client.js';
+import { createHealthProber, type HealthProber, type Invoker } from './webhook-client.js';
 
 /** A publish request from an authenticated provider — the server assigns the owner. */
 export type PublishInput = Omit<ListingInput, 'agentNametag'>;
@@ -44,6 +44,13 @@ export interface JobSummary {
   updatedAt: number;
 }
 
+/** The result of the last reachability probe of a listing's provider endpoint. */
+export interface ListingHealth {
+  ok: boolean;
+  checkedAt: number;
+  detail?: string;
+}
+
 /** A listing plus the platform metadata the marketplace renders. */
 export type DecoratedListing = Listing & {
   favorites: number;
@@ -52,6 +59,10 @@ export type DecoratedListing = Listing & {
   ratingCount: number;
   jobsCompleted: number;
   successRate: number;
+  /** Last health probe of the provider endpoint (null if never checked). */
+  health: ListingHealth | null;
+  /** True when the provider answered a health probe — the "verified" badge. */
+  verified: boolean;
 };
 
 /** Aggregated public view of one principal's activity on the bazaar. */
@@ -73,6 +84,11 @@ export interface ProfileView {
     spentUct: number;
     favoritesReceived: number;
   };
+}
+
+/** The `/health` endpoint alongside a provider's webhook job URL. */
+export function healthUrlOf(webhookUrl: string): string {
+  return new URL('/health', webhookUrl).toString();
 }
 
 /** Normalize an identifier to a principal key: a pubkey stays hex, else `@nametag`. */
@@ -100,6 +116,7 @@ export interface BazaarSnapshot {
   favorites: [string, string[]][];
   favoriteCounts: [string, number][];
   webhookSecrets: [string, string][];
+  listingHealth: [string, ListingHealth][];
 }
 
 /** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
@@ -114,6 +131,8 @@ export interface BazaarServiceOptions {
   agent: BazaarAgent;
   /** Dispatches a job to the provider agent (webhook / capsule). */
   invoke: Invoker;
+  /** Probes a provider endpoint's `/health` (defaults to a real HTTP prober). */
+  probe?: HealthProber;
   /** How long a delivered job waits before auto-releasing to the provider. */
   autoReleaseMs?: number;
   logger?: Logger;
@@ -157,6 +176,7 @@ export interface JobView {
 export class BazaarService {
   private readonly agent: BazaarAgent;
   private readonly invoke: Invoker;
+  private readonly probe: HealthProber;
   private readonly autoReleaseMs: number;
   private readonly log: Logger;
 
@@ -183,6 +203,8 @@ export class BazaarService {
   private readonly favoriteCounts = new Map<string, number>();
   /** listingId -> the HMAC secret we sign that listing's job POSTs with. */
   private readonly webhookSecrets = new Map<string, string>();
+  /** listingId -> last provider-endpoint health probe (drives the verified badge). */
+  private readonly listingHealth = new Map<string, ListingHealth>();
 
   // Settlement is serialized so escrow payouts can't race on coin selection.
   private payLock: Promise<void> = Promise.resolve();
@@ -192,6 +214,7 @@ export class BazaarService {
   constructor(opts: BazaarServiceOptions) {
     this.agent = opts.agent;
     this.invoke = opts.invoke;
+    this.probe = opts.probe ?? createHealthProber();
     this.autoReleaseMs = opts.autoReleaseMs ?? 2 * 60_000;
     this.log = opts.logger ?? createLogger('bazaar');
   }
@@ -220,6 +243,57 @@ export class BazaarService {
   /** The webhook signing secret for a listing (surfaced ONCE in the publish response). */
   webhookSecretFor(listingId: string): string | undefined {
     return this.webhookSecrets.get(listingId);
+  }
+
+  /** The last recorded health of a listing's provider endpoint. */
+  listingHealthOf(listingId: string): ListingHealth | undefined {
+    return this.listingHealth.get(listingId);
+  }
+
+  /**
+   * Probe a listing's provider endpoint and record the result. A webhook agent's
+   * `/health` sits alongside its job path; a reachable one earns the verified
+   * badge. Never throws — an unreachable endpoint is a recorded `ok:false`.
+   */
+  async verifyListingHealth(listingId: string): Promise<ListingHealth> {
+    const listing = this.listings.get(listingId);
+    if (!listing) throw new Error('unknown listing');
+    let probe: { ok: boolean; detail?: string };
+    if (listing.channel.kind === 'webhook') {
+      probe = await this.probe(healthUrlOf(listing.channel.url));
+    } else {
+      probe = { ok: false, detail: 'capsule endpoints are not health-probed yet' };
+    }
+    const health: ListingHealth = {
+      ok: probe.ok,
+      checkedAt: Date.now(),
+      ...(probe.detail ? { detail: probe.detail } : {}),
+    };
+    this.listingHealth.set(listingId, health);
+    return health;
+  }
+
+  /**
+   * Run a real, unpaid invocation against a listing's endpoint so the owner can
+   * confirm their agent answers before a buyer ever pays. Owner-only. Signals a
+   * dry run with `amountUct: 0` and a `test-` escrow ref; no escrow is opened.
+   */
+  async testInvoke(listingId: string, caller: Identity, input: unknown): Promise<ServiceResult> {
+    const listing = this.listings.get(listingId);
+    if (!listing) throw new Error('unknown listing');
+    const owner = this.listingProviders.get(listingId);
+    if (owner?.chainPubkey && owner.chainPubkey !== caller.chainPubkey) {
+      throw new Error('only the listing owner can run a test invocation');
+    }
+    const invocation: ServiceInvocation = {
+      jobId: `test_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
+      listingId,
+      buyerNametag: principalOf(caller),
+      input,
+      amountUct: 0,
+      escrowRef: `test-${Date.now()}`,
+    };
+    return this.invoke(listing.channel, invocation, this.webhookSecrets.get(listingId));
   }
 
   getListings(): Listing[] {
@@ -575,6 +649,7 @@ export class BazaarService {
       avgRating: view.avgRating,
       ratingCount: rep?.ratingCount ?? 0,
     });
+    const health = this.listingHealth.get(listing.id) ?? null;
     return {
       ...listing,
       favorites,
@@ -583,6 +658,8 @@ export class BazaarService {
       ratingCount: rep?.ratingCount ?? 0,
       jobsCompleted: view.jobsCompleted,
       successRate: view.successRate,
+      health,
+      verified: health?.ok === true,
     };
   }
 
@@ -755,6 +832,7 @@ export class BazaarService {
       favorites: [...this.favorites].map(([k, set]) => [k, [...set]] as [string, string[]]),
       favoriteCounts: [...this.favoriteCounts],
       webhookSecrets: [...this.webhookSecrets],
+      listingHealth: [...this.listingHealth],
     };
   }
 
@@ -778,6 +856,7 @@ export class BazaarService {
     fill(this.reviewsByProvider, snap.reviewsByProvider);
     fill(this.favoriteCounts, snap.favoriteCounts);
     fill(this.webhookSecrets, snap.webhookSecrets ?? []);
+    fill(this.listingHealth, snap.listingHealth ?? []);
     this.seenFunding.clear();
     for (const k of snap.seenFunding) this.seenFunding.add(k);
     this.favorites.clear();

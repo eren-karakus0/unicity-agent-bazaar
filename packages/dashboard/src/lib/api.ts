@@ -25,6 +25,14 @@ export interface Listing {
   ratingCount?: number;
   jobsCompleted?: number;
   successRate?: number;
+  health?: ListingHealth | null;
+  verified?: boolean;
+}
+
+export interface ListingHealth {
+  ok: boolean;
+  checkedAt: number;
+  detail?: string;
 }
 
 export interface Review {
@@ -223,7 +231,19 @@ export const api = {
     category: Category;
     priceUct: number;
     webhookUrl: string;
-  }) => post<{ listing: Listing }>('/api/listings', { ...input, channelKind: 'webhook' }).then((r) => r.listing),
+  }) =>
+    post<{ listing: Listing; webhookSecret?: string; health?: ListingHealth }>('/api/listings', {
+      ...input,
+      channelKind: 'webhook',
+    }),
+  testInvoke: (listingId: string, input: unknown) =>
+    post<{ result: ServiceResult }>(`/api/listings/${encodeURIComponent(listingId)}/test`, { input }).then(
+      (r) => r.result,
+    ),
+  recheckHealth: (listingId: string) =>
+    post<{ health: ListingHealth }>(`/api/listings/${encodeURIComponent(listingId)}/health`, {}).then(
+      (r) => r.health,
+    ),
   hire: (listingId: string, input: unknown) => post<HireResult>('/api/hire', { listingId, input }),
   job: (jobId: string) => get<JobView>(`/api/jobs/${encodeURIComponent(jobId)}`),
   accept: (jobId: string) => post<{ job: EscrowJob }>(`/api/jobs/${encodeURIComponent(jobId)}/accept`, {}),

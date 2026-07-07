@@ -22,6 +22,37 @@ function webhookSignature(secret: string, timestamp: number, body: string): stri
   return crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
 }
 
+/** Result of probing a provider's `/health` endpoint. */
+export interface HealthProbe {
+  ok: boolean;
+  detail?: string;
+}
+
+/** Probes a provider agent's reachability. Injected so publish flow is testable. */
+export type HealthProber = (url: string) => Promise<HealthProbe>;
+
+/** The real health prober: a short-timeout GET that treats any 2xx as reachable. */
+export function createHealthProber(opts?: { timeoutMs?: number }): HealthProber {
+  const timeoutMs = opts?.timeoutMs ?? 5_000;
+  return async (url) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      if (!res.ok) return { ok: false, detail: `health returned HTTP ${res.status}` };
+      return { ok: true };
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === 'AbortError';
+      return {
+        ok: false,
+        detail: aborted ? `health timed out after ${timeoutMs}ms` : e instanceof Error ? e.message : 'unreachable',
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 /** The real invoker: POST the invocation to the provider's webhook. */
 export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
   const timeoutMs = opts?.timeoutMs ?? 20_000;

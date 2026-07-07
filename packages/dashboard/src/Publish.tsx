@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { api, CATEGORIES, type Category } from './lib/api';
+import { api, CATEGORIES, type Category, type Listing, type ListingHealth, type ServiceResult } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
 import { go } from './lib/nav';
@@ -12,6 +12,12 @@ interface Form {
   webhookUrl: string;
 }
 
+interface Published {
+  listing: Listing;
+  webhookSecret?: string;
+  health?: ListingHealth;
+}
+
 export function Publish() {
   const { session, phase, signIn } = useAuth();
   const toast = useToast();
@@ -22,7 +28,8 @@ export function Publish() {
     priceUct: 3,
     webhookUrl: '',
   });
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [published, setPublished] = useState<Published | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const set =
@@ -32,15 +39,16 @@ export function Publish() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setMsg(null);
+    setError(null);
     try {
-      const l = await api.publish({ ...f, priceUct: Number(f.priceUct) });
-      setMsg({ ok: true, text: `Published “${l.title}” at ${l.priceUct} UCT — it’s live on the marketplace.` });
-      toast(`Published “${l.title}”`, 'ok');
+      const res = await api.publish({ ...f, priceUct: Number(f.priceUct) });
+      setPublished(res);
+      toast(`Published “${res.listing.title}”`, 'ok');
       setF({ title: '', description: '', category: 'analysis', priceUct: 3, webhookUrl: '' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       const text = err instanceof Error ? err.message : 'publish failed';
-      setMsg({ ok: false, text });
+      setError(text);
       toast(text, 'bad');
     } finally {
       setBusy(false);
@@ -60,6 +68,8 @@ export function Publish() {
         </p>
       </section>
 
+      {published && <PublishSuccess data={published} onDismiss={() => setPublished(null)} />}
+
       {phase !== 'authenticated' ? (
         <div className="panel gate">
           <h3 className="gate__h">Sign in to publish</h3>
@@ -73,16 +83,7 @@ export function Publish() {
         </div>
       ) : (
         <form className="panel" onSubmit={submit}>
-          {msg && (
-            <div className={`formmsg ${msg.ok ? 'formmsg--ok' : 'formmsg--bad'}`}>
-              {msg.text}
-              {msg.ok && (
-                <button type="button" className="formmsg__link" onClick={() => go('/')}>
-                  View on the marketplace →
-                </button>
-              )}
-            </div>
-          )}
+          {error && <div className="formmsg formmsg--bad">{error}</div>}
           <div className="field">
             <label>publishing as</label>
             <div className="whoami">
@@ -126,8 +127,8 @@ export function Publish() {
             <label>webhook URL</label>
             <input value={f.webhookUrl} onChange={set('webhookUrl')} placeholder="https://my-agent.example.com/hook" required />
             <div className="hint">
-              the bazaar POSTs each job here (ServiceInvocation &rarr; ServiceResult). Build it in minutes with
-              @bazaar/agent-kit.
+              the bazaar POSTs each job here (ServiceInvocation &rarr; ServiceResult), signed so you can verify it.
+              Build it in minutes with @bazaar/agent-kit.
             </div>
           </div>
           <div className="dialog__actions">
@@ -139,4 +140,137 @@ export function Publish() {
       )}
     </>
   );
+}
+
+/** Post-publish console: secret handoff, reachability, and a live test invocation. */
+function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () => void }) {
+  const toast = useToast();
+  const [health, setHealth] = useState<ListingHealth | undefined>(data.health);
+  const [checking, setChecking] = useState(false);
+  const [testInput, setTestInput] = useState('{\n  "example": "value"\n}');
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<ServiceResult | null>(null);
+  const [secretShown, setSecretShown] = useState(false);
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`${label} copied`, 'ok');
+    } catch {
+      toast('copy failed — select and copy manually', 'bad');
+    }
+  };
+
+  const recheck = async () => {
+    setChecking(true);
+    try {
+      setHealth(await api.recheckHealth(data.listing.id));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'health check failed', 'bad');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const runTest = async () => {
+    setTesting(true);
+    setResult(null);
+    let input: unknown = testInput;
+    try {
+      input = JSON.parse(testInput);
+    } catch {
+      // not JSON — send the raw string as the input
+    }
+    try {
+      setResult(await api.testInvoke(data.listing.id, input));
+    } catch (e) {
+      setResult({ jobId: 'test', ok: false, error: e instanceof Error ? e.message : 'test failed' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="panel publish-ok">
+      <div className="publish-ok__head">
+        <div>
+          <div className="publish-ok__kick">live on the marketplace</div>
+          <h3 className="publish-ok__h">“{data.listing.title}” is published</h3>
+        </div>
+        <button className="btn btn--ghost btn--sm" onClick={onDismiss} aria-label="dismiss">
+          ✕
+        </button>
+      </div>
+
+      <div className="publish-ok__row">
+        <HealthPill health={health} />
+        <button className="btn btn--ghost btn--sm" disabled={checking} onClick={() => void recheck()}>
+          {checking ? 'checking…' : 're-check'}
+        </button>
+        <button className="btn btn--ghost btn--sm" onClick={() => go('/profile')}>
+          View in your profile →
+        </button>
+      </div>
+
+      {data.webhookSecret && (
+        <div className="secretbox">
+          <div className="secretbox__label">
+            signing secret <span className="secretbox__once">shown once — save it now</span>
+          </div>
+          <p className="secretbox__hint">
+            The bazaar signs every job POST with this secret (header <code>x-bazaar-signature</code>). Verify it in
+            your agent so only real, escrow-backed jobs run. Pass it as <code>secret</code> to{' '}
+            <code>createAgentServer</code>.
+          </p>
+          <div className="secretbox__row">
+            <code className="secretbox__code">
+              {secretShown ? data.webhookSecret : '•'.repeat(Math.min(48, data.webhookSecret.length))}
+            </code>
+            <button className="btn btn--ghost btn--sm" onClick={() => setSecretShown((s) => !s)}>
+              {secretShown ? 'hide' : 'reveal'}
+            </button>
+            <button className="btn btn--primary btn--sm" onClick={() => void copy(data.webhookSecret!, 'Secret')}>
+              copy
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="testbox">
+        <div className="testbox__label">test invocation</div>
+        <p className="secretbox__hint">
+          Send a sample input straight to your webhook (no escrow, no charge) to confirm it answers before a buyer
+          hires it.
+        </p>
+        <textarea
+          className="testbox__in"
+          value={testInput}
+          onChange={(e) => setTestInput(e.target.value)}
+          spellCheck={false}
+          rows={4}
+        />
+        <div className="testbox__actions">
+          <button className="btn btn--primary btn--sm" disabled={testing} onClick={() => void runTest()}>
+            {testing ? 'calling your agent…' : 'Run test'}
+          </button>
+        </div>
+        {result && (
+          <div className={`testresult ${result.ok ? 'testresult--ok' : 'testresult--bad'}`}>
+            <div className="testresult__head">{result.ok ? '✓ agent responded' : '✕ call failed'}</div>
+            <pre className="testresult__body">
+              {result.ok
+                ? JSON.stringify(result.output ?? null, null, 2)
+                : (result.error ?? 'no error detail')}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HealthPill({ health }: { health?: ListingHealth }) {
+  if (!health) return <span className="hpill hpill--unknown">reachability unknown</span>;
+  if (health.ok) return <span className="hpill hpill--ok">✓ verified — endpoint reachable</span>;
+  return <span className="hpill hpill--bad">unreachable{health.detail ? ` — ${health.detail}` : ''}</span>;
 }

@@ -276,6 +276,59 @@ describe('BazaarService — reviews, favorites, trending', () => {
   });
 });
 
+describe('BazaarService — publish hardening (health + test invoke)', () => {
+  it('marks a reachable listing verified and probes its /health sibling', async () => {
+    const probed: string[] = [];
+    const svc = new BazaarService({
+      agent: stubAgent([]),
+      invoke: invoker('ok'),
+      probe: async (url) => {
+        probed.push(url);
+        return { ok: true };
+      },
+    });
+    const listing = svc.publishListing(publishInput, provider);
+    const health = await svc.verifyListingHealth(listing.id);
+    expect(health.ok).toBe(true);
+    // /health sits at the root of the provider host, not under the job path.
+    expect(probed).toEqual(['https://scout.example.com/health']);
+    expect(svc.decorateListing(listing).verified).toBe(true);
+  });
+
+  it('records an unreachable endpoint without verifying it', async () => {
+    const svc = new BazaarService({
+      agent: stubAgent([]),
+      invoke: invoker('ok'),
+      probe: async () => ({ ok: false, detail: 'unreachable' }),
+    });
+    const listing = svc.publishListing(publishInput, provider);
+    const health = await svc.verifyListingHealth(listing.id);
+    expect(health).toMatchObject({ ok: false, detail: 'unreachable' });
+    expect(svc.decorateListing(listing).verified).toBe(false);
+  });
+
+  it('runs an unpaid test invocation for the owner and blocks non-owners', async () => {
+    let seen: ServiceInvocation | undefined;
+    const svc = new BazaarService({
+      agent: stubAgent([]),
+      invoke: async (_c, inv) => {
+        seen = inv;
+        return { jobId: inv.jobId, ok: true, output: { pong: inv.input } };
+      },
+    });
+    const listing = svc.publishListing(publishInput, provider);
+
+    const result = await svc.testInvoke(listing.id, provider, { ping: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.output).toEqual({ pong: { ping: 1 } });
+    // A test carries no escrow: zero amount + a `test-` ref, so agents can tell.
+    expect(seen?.amountUct).toBe(0);
+    expect(seen?.escrowRef.startsWith('test-')).toBe(true);
+
+    await expect(svc.testInvoke(listing.id, buyer, {})).rejects.toThrow(/only the listing owner/);
+  });
+});
+
 describe('BazaarService — persistence', () => {
   it('round-trips full state through snapshot/restore', async () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });

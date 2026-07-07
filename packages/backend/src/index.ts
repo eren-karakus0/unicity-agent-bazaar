@@ -21,7 +21,7 @@ import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
 import { BazaarService, type BazaarSnapshot } from './bazaar-service.js';
 import { AuthService, principalOf, type Identity } from './auth.js';
-import { createWebhookInvoker } from './webhook-client.js';
+import { createHealthProber, createWebhookInvoker } from './webhook-client.js';
 import { loadSnapshot, saveSnapshot } from './persist.js';
 
 const env = loadEnv();
@@ -60,6 +60,7 @@ async function boot(): Promise<void> {
   service = new BazaarService({
     agent: escrowAgent,
     invoke: createWebhookInvoker({ timeoutMs: 20_000 }),
+    probe: createHealthProber({ timeoutMs: 5_000 }),
     autoReleaseMs: env.autoReleaseMs,
     logger: createLogger('bazaar'),
   });
@@ -268,13 +269,56 @@ const server = http.createServer((req, res) => {
           },
           identity,
         );
-        // The webhook secret is returned ONCE here so the provider can verify
-        // signed job calls — there is no endpoint to read it back later.
-        json(res, 200, { listing, webhookSecret: svc.webhookSecretFor(listing.id) });
+        // Probe the provider endpoint so the publish response can tell the owner
+        // whether their agent is reachable (the verified badge). The webhook
+        // secret is returned ONCE here — there is no endpoint to read it later.
+        void svc.verifyListingHealth(listing.id).then((health) => {
+          json(res, 200, {
+            listing: svc.decorateListing(listing),
+            webhookSecret: svc.webhookSecretFor(listing.id),
+            health,
+          });
+        });
       } catch (e) {
         json(res, 400, { error: e instanceof Error ? e.message : 'could not publish listing' });
       }
     });
+    return;
+  }
+
+  const testMatch = pathname.match(/^\/api\/listings\/([^/]+)\/test$/);
+  if (testMatch && method === 'POST') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in as the listing owner to run a test' });
+      return;
+    }
+    void readJson(req).then((body) => {
+      svc
+        .testInvoke(decodeURIComponent(testMatch[1]!), identity, body.input)
+        .then((result) => json(res, 200, { result }))
+        .catch((e) => json(res, 400, { error: e instanceof Error ? e.message : 'test invocation failed' }));
+    });
+    return;
+  }
+
+  const healthMatch = pathname.match(/^\/api\/listings\/([^/]+)\/health$/);
+  if (healthMatch && method === 'POST') {
+    const identity = identityOf(req);
+    if (!identity) {
+      json(res, 401, { error: 'sign in as the listing owner to re-check health' });
+      return;
+    }
+    const listingId = decodeURIComponent(healthMatch[1]!);
+    const owner = svc.listingOwner(listingId);
+    if (owner?.chainPubkey && owner.chainPubkey !== identity.chainPubkey) {
+      json(res, 403, { error: 'only the listing owner can re-check its health' });
+      return;
+    }
+    svc
+      .verifyListingHealth(listingId)
+      .then((health) => json(res, 200, { health }))
+      .catch((e) => json(res, 400, { error: e instanceof Error ? e.message : 'health check failed' }));
     return;
   }
 
