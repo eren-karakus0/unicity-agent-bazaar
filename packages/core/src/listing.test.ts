@@ -35,6 +35,39 @@ describe('validateListing', () => {
   });
 });
 
+describe('validateListing — input schema', () => {
+  it('accepts a valid declared schema', () => {
+    const r = validateListing({
+      ...good,
+      inputSchema: [
+        { name: 'repo', label: 'Repository URL', type: 'url', required: true },
+        { name: 'deep', label: 'Deep scan', type: 'boolean' },
+      ],
+    });
+    expect(r).toEqual({ ok: true, errors: [] });
+  });
+
+  it('rejects bad field names, duplicates, and unknown types', () => {
+    const r = validateListing({
+      ...good,
+      inputSchema: [
+        { name: 'ok field!', label: 'Bad name', type: 'text' },
+        { name: 'dup', label: 'One', type: 'text' },
+        { name: 'dup', label: 'Two', type: 'text' },
+        { name: 'x', label: 'Bad type', type: 'money' as never },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => /1-32 chars/.test(e))).toBe(true);
+    expect(r.errors.some((e) => /duplicate field/.test(e))).toBe(true);
+    expect(r.errors.some((e) => /type must be one of/.test(e))).toBe(true);
+  });
+
+  it('requires a label on every field', () => {
+    expect(validateListing({ ...good, inputSchema: [{ name: 'a', label: '  ', type: 'text' }] }).ok).toBe(false);
+  });
+});
+
 describe('makeListing', () => {
   it('produces a normalized nametag, a slug, and a stable id', () => {
     const l = makeListing(good, 1234);
@@ -51,5 +84,21 @@ describe('makeListing', () => {
 
   it('throws on invalid input', () => {
     expect(() => makeListing({ ...good, priceUct: -1 })).toThrow(/invalid listing/);
+  });
+
+  it('normalizes and keeps a declared input schema, dropping junk props', () => {
+    const l = makeListing({
+      ...good,
+      inputSchema: [
+        { name: 'repo', label: '  Repo  ', type: 'url', required: true, placeholder: ' https://… ', extra: 1 } as never,
+      ],
+    });
+    expect(l.inputSchema).toEqual([
+      { name: 'repo', label: 'Repo', type: 'url', required: true, placeholder: 'https://…' },
+    ]);
+  });
+
+  it('omits an empty input schema entirely', () => {
+    expect(makeListing({ ...good, inputSchema: [] }).inputSchema).toBeUndefined();
   });
 });

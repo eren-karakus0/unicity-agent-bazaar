@@ -16,6 +16,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
+import type { InputField } from '@bazaar/core';
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
@@ -150,6 +151,29 @@ function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
 }
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
+/** Coerce a request body's `inputSchema` into declared fields (core validates them). */
+function parseInputSchema(v: unknown): InputField[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: InputField[] = [];
+  for (const raw of v) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const name = str(r.name);
+    const label = str(r.label);
+    const type = str(r.type);
+    if (!name || !label || !type) continue;
+    out.push({
+      name,
+      label,
+      type: type as InputField['type'],
+      ...(r.required === true ? { required: true } : {}),
+      ...(str(r.placeholder) ? { placeholder: str(r.placeholder)! } : {}),
+      ...(str(r.help) ? { help: str(r.help)! } : {}),
+    });
+  }
+  return out.length ? out : undefined;
+}
+
 /** The proven identity behind a request, from its `Authorization: Bearer <token>`. */
 function identityOf(req: http.IncomingMessage): Identity | null {
   const header = req.headers['authorization'];
@@ -266,6 +290,7 @@ const server = http.createServer((req, res) => {
             category: str(body.category) ?? 'other',
             priceUct: Number(body.priceUct),
             channel,
+            ...(parseInputSchema(body.inputSchema) ? { inputSchema: parseInputSchema(body.inputSchema) } : {}),
           },
           identity,
         );

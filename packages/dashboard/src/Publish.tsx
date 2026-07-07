@@ -1,8 +1,19 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { api, CATEGORIES, type Category, type Listing, type ListingHealth, type ServiceResult } from './lib/api';
+import {
+  api,
+  CATEGORIES,
+  INPUT_FIELD_TYPES,
+  type Category,
+  type InputField,
+  type InputFieldType,
+  type Listing,
+  type ListingHealth,
+  type ServiceResult,
+} from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
 import { go } from './lib/nav';
+import { sampleJson } from './lib/schema';
 
 interface Form {
   title: string;
@@ -10,6 +21,31 @@ interface Form {
   category: Category;
   priceUct: number;
   webhookUrl: string;
+}
+
+/** A row in the input-schema builder (name is derived from the label at publish). */
+interface BuilderField {
+  label: string;
+  type: InputFieldType;
+  required: boolean;
+}
+
+const slugKey = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+
+/** Turn builder rows into a clean, de-duplicated InputField[] for the API. */
+function finalizeSchema(rows: BuilderField[]): InputField[] {
+  const used = new Set<string>();
+  return rows
+    .filter((r) => r.label.trim())
+    .map((r, i) => {
+      const base = slugKey(r.label) || `field_${i + 1}`;
+      let name = base;
+      let k = 2;
+      while (used.has(name)) name = `${base}_${k++}`;
+      used.add(name);
+      return { name, label: r.label.trim(), type: r.type, ...(r.required ? { required: true } : {}) };
+    });
 }
 
 interface Published {
@@ -28,6 +64,7 @@ export function Publish() {
     priceUct: 3,
     webhookUrl: '',
   });
+  const [fields, setFields] = useState<BuilderField[]>([]);
   const [published, setPublished] = useState<Published | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,10 +78,16 @@ export function Publish() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.publish({ ...f, priceUct: Number(f.priceUct) });
+      const inputSchema = finalizeSchema(fields);
+      const res = await api.publish({
+        ...f,
+        priceUct: Number(f.priceUct),
+        ...(inputSchema.length ? { inputSchema } : {}),
+      });
       setPublished(res);
       toast(`Published “${res.listing.title}”`, 'ok');
       setF({ title: '', description: '', category: 'analysis', priceUct: 3, webhookUrl: '' });
+      setFields([]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       const text = err instanceof Error ? err.message : 'publish failed';
@@ -131,6 +174,9 @@ export function Publish() {
               Build it in minutes with @bazaar/agent-kit.
             </div>
           </div>
+
+          <SchemaBuilder fields={fields} onChange={setFields} />
+
           <div className="dialog__actions">
             <button className="btn btn--primary" disabled={busy} type="submit">
               {busy ? 'publishing…' : 'Publish listing'}
@@ -142,12 +188,67 @@ export function Publish() {
   );
 }
 
+/** Optional builder: declare the typed input fields the hire form should render. */
+function SchemaBuilder({ fields, onChange }: { fields: BuilderField[]; onChange: (f: BuilderField[]) => void }) {
+  const add = () => onChange([...fields, { label: '', type: 'text', required: false }]);
+  const update = (i: number, patch: Partial<BuilderField>) =>
+    onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  const remove = (i: number) => onChange(fields.filter((_, j) => j !== i));
+
+  return (
+    <div className="field">
+      <label>input fields <span className="whoami__hint">— optional; buyers get a typed form instead of a text box</span></label>
+      {fields.length === 0 && (
+        <div className="hint" style={{ marginBottom: 8 }}>
+          No fields yet — buyers will send a single free-text input. Add fields to define exactly what your agent
+          expects.
+        </div>
+      )}
+      <div className="fieldrows">
+        {fields.map((f, i) => (
+          <div className="fieldrow" key={i}>
+            <input
+              className="fieldrow__label"
+              value={f.label}
+              onChange={(e) => update(i, { label: e.target.value })}
+              placeholder="Field label (e.g. Repository URL)"
+            />
+            <select value={f.type} onChange={(e) => update(i, { type: e.target.value as InputFieldType })}>
+              {INPUT_FIELD_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <label className="fieldrow__req" title="required">
+              <input
+                type="checkbox"
+                checked={f.required}
+                onChange={(e) => update(i, { required: e.target.checked })}
+              />
+              req
+            </label>
+            <button type="button" className="fieldrow__x" onClick={() => remove(i)} aria-label="remove field">
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={add} style={{ marginTop: 8 }}>
+        + add field
+      </button>
+    </div>
+  );
+}
+
 /** Post-publish console: secret handoff, reachability, and a live test invocation. */
 function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () => void }) {
   const toast = useToast();
   const [health, setHealth] = useState<ListingHealth | undefined>(data.health);
   const [checking, setChecking] = useState(false);
-  const [testInput, setTestInput] = useState('{\n  "example": "value"\n}');
+  const [testInput, setTestInput] = useState(() =>
+    data.listing.inputSchema?.length ? sampleJson(data.listing.inputSchema) : '{\n  "example": "value"\n}',
+  );
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<ServiceResult | null>(null);
   const [secretShown, setSecretShown] = useState(false);

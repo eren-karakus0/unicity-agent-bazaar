@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type EscrowState, type HireResult, type JobView, type Listing, type Review } from './lib/api';
+import { api, type EscrowState, type HireResult, type InputField, type JobView, type Listing, type Review } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
+import { buildInput, firstMissingRequired, initialValues, type FieldValues } from './lib/schema';
 
 const STEPS: { key: EscrowState; label: string }[] = [
   { key: 'quoted', label: 'quoted' },
@@ -18,7 +19,9 @@ function toBaseUnits(amountUct: number, decimals: number): string {
 
 export function HireDialog({ listing, onClose }: { listing: Listing; onClose: () => void }) {
   const { session, phase, signIn, wallet, refreshBalance } = useAuth();
+  const schema = listing.inputSchema ?? [];
   const [input, setInput] = useState('');
+  const [values, setValues] = useState<FieldValues>(() => initialValues(schema));
   const [hire, setHire] = useState<HireResult | null>(null);
   const [jobv, setJobv] = useState<JobView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,9 +39,17 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
 
   const openEscrow = async () => {
     setErr(null);
+    if (schema.length > 0) {
+      const missing = firstMissingRequired(schema, values);
+      if (missing) {
+        setErr(`“${missing.label}” is required`);
+        return;
+      }
+    }
     setBusy(true);
     try {
-      const parsed = input.trim() ? { text: input } : {};
+      const parsed =
+        schema.length > 0 ? buildInput(schema, values) : input.trim() ? { text: input } : {};
       const h = await api.hire(listing.id, parsed);
       setHire(h);
       const tick = () => api.job(h.job.jobId).then(setJobv).catch(() => {});
@@ -117,15 +128,19 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                   {displayName(session)}
                 </div>
               </div>
-              <div className="field">
-                <label>task input</label>
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Text for the agent to work on…"
-                />
-                <div className="hint">sent to the agent as &#123; text &#125; once the escrow is funded</div>
-              </div>
+              {schema.length > 0 ? (
+                <SchemaFields schema={schema} values={values} onChange={setValues} />
+              ) : (
+                <div className="field">
+                  <label>task input</label>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Text for the agent to work on…"
+                  />
+                  <div className="hint">sent to the agent as &#123; text &#125; once the escrow is funded</div>
+                </div>
+              )}
               <div className="dialog__actions">
                 <button className="btn btn--primary" disabled={busy} onClick={openEscrow}>
                   {busy ? 'opening…' : `Open escrow · ${listing.priceUct} UCT`}
@@ -248,6 +263,55 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
         </div>
       </div>
     </div>
+  );
+}
+
+/** Renders a listing's declared input schema as a typed form. */
+function SchemaFields({
+  schema,
+  values,
+  onChange,
+}: {
+  schema: InputField[];
+  values: FieldValues;
+  onChange: (v: FieldValues) => void;
+}) {
+  const set = (name: string, v: string | boolean) => onChange({ ...values, [name]: v });
+  return (
+    <>
+      {schema.map((f) => (
+        <div className="field" key={f.name}>
+          <label>
+            {f.label}
+            {f.required && <span className="req"> *</span>}
+          </label>
+          {f.type === 'textarea' ? (
+            <textarea
+              value={String(values[f.name] ?? '')}
+              onChange={(e) => set(f.name, e.target.value)}
+              placeholder={f.placeholder}
+            />
+          ) : f.type === 'boolean' ? (
+            <label className="checkrow">
+              <input
+                type="checkbox"
+                checked={values[f.name] === true}
+                onChange={(e) => set(f.name, e.target.checked)}
+              />
+              <span>{f.placeholder ?? 'yes'}</span>
+            </label>
+          ) : (
+            <input
+              type={f.type === 'number' ? 'number' : f.type === 'url' ? 'url' : 'text'}
+              value={String(values[f.name] ?? '')}
+              onChange={(e) => set(f.name, e.target.value)}
+              placeholder={f.placeholder}
+            />
+          )}
+          {f.help && <div className="hint">{f.help}</div>}
+        </div>
+      ))}
+    </>
   );
 }
 

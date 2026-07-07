@@ -7,6 +7,18 @@ export const CATEGORIES: Category[] = ['analysis', 'data', 'creative', 'automati
 
 export type DeliveryChannel = { kind: 'webhook'; url: string } | { kind: 'capsule'; ref: string };
 
+export const INPUT_FIELD_TYPES = ['text', 'textarea', 'number', 'boolean', 'url'] as const;
+export type InputFieldType = (typeof INPUT_FIELD_TYPES)[number];
+
+export interface InputField {
+  name: string;
+  label: string;
+  type: InputFieldType;
+  required?: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
 export interface Listing {
   id: string;
   slug: string;
@@ -16,6 +28,7 @@ export interface Listing {
   category: Category;
   priceUct: number;
   channel: DeliveryChannel;
+  inputSchema?: InputField[];
   active: boolean;
   createdAt: number;
   // platform metadata (present on decorated responses)
@@ -231,6 +244,7 @@ export const api = {
     category: Category;
     priceUct: number;
     webhookUrl: string;
+    inputSchema?: InputField[];
   }) =>
     post<{ listing: Listing; webhookSecret?: string; health?: ListingHealth }>('/api/listings', {
       ...input,

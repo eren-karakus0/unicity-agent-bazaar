@@ -1834,6 +1834,70 @@ button {
   word-break: break-word;
 }
 
+/* ---- input-schema builder (publish) + required marks ---- */
+.fieldrows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fieldrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fieldrow__label {
+  flex: 1;
+  min-width: 0;
+}
+.fieldrow select {
+  width: auto;
+  flex: 0 0 auto;
+}
+.fieldrow__req {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fieldrow__req input {
+  width: auto;
+  margin: 0;
+}
+.fieldrow__x {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  transition: 0.16s;
+}
+.fieldrow__x:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.req {
+  color: var(--brand-orange);
+}
+.checkrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.checkrow input {
+  width: auto;
+  margin: 0;
+}
+
 /* verified badge on listing cards */
 .vbadge {
   display: inline-block;
