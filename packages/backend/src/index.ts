@@ -268,7 +268,9 @@ const server = http.createServer((req, res) => {
           },
           identity,
         );
-        json(res, 200, { listing });
+        // The webhook secret is returned ONCE here so the provider can verify
+        // signed job calls — there is no endpoint to read it back later.
+        json(res, 200, { listing, webhookSecret: svc.webhookSecretFor(listing.id) });
       } catch (e) {
         json(res, 400, { error: e instanceof Error ? e.message : 'could not publish listing' });
       }

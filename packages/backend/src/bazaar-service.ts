@@ -22,6 +22,7 @@ import {
   type ServiceInvocation,
   type ServiceResult,
 } from '@bazaar/core';
+import crypto from 'node:crypto';
 import { principalOf, type Identity } from './auth.js';
 import { Logger, createLogger } from './logger.js';
 import type { Invoker } from './webhook-client.js';
@@ -98,6 +99,7 @@ export interface BazaarSnapshot {
   reviewsByProvider: [string, string[]][];
   favorites: [string, string[]][];
   favoriteCounts: [string, number][];
+  webhookSecrets: [string, string][];
 }
 
 /** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
@@ -179,6 +181,8 @@ export class BazaarService {
   private readonly favorites = new Map<string, Set<string>>();
   /** listingId -> favorite count (denormalized for cheap reads). */
   private readonly favoriteCounts = new Map<string, number>();
+  /** listingId -> the HMAC secret we sign that listing's job POSTs with. */
+  private readonly webhookSecrets = new Map<string, string>();
 
   // Settlement is serialized so escrow payouts can't race on coin selection.
   private payLock: Promise<void> = Promise.resolve();
@@ -203,11 +207,19 @@ export class BazaarService {
     const listing = makeListing({ ...input, agentNametag }); // validates; throws on bad input
     this.listings.set(listing.id, listing);
     this.listingProviders.set(listing.id, owner);
+    if (listing.channel.kind === 'webhook') {
+      this.webhookSecrets.set(listing.id, crypto.randomBytes(24).toString('hex'));
+    }
     if (!this.reputations.has(agentNametag)) {
       this.reputations.set(agentNametag, newReputation(agentNametag));
     }
     this.log.info(`listing published: ${listing.slug} — ${listing.priceUct} UCT by ${agentNametag}`);
     return listing;
+  }
+
+  /** The webhook signing secret for a listing (surfaced ONCE in the publish response). */
+  webhookSecretFor(listingId: string): string | undefined {
+    return this.webhookSecrets.get(listingId);
   }
 
   getListings(): Listing[] {
@@ -304,7 +316,7 @@ export class BazaarService {
       };
       let result: ServiceResult;
       try {
-        result = await this.invoke(listing.channel, invocation);
+        result = await this.invoke(listing.channel, invocation, this.webhookSecrets.get(listing.id));
       } catch (e) {
         result = { jobId: job.jobId, ok: false, error: e instanceof Error ? e.message : 'invocation error' };
       }
@@ -742,6 +754,7 @@ export class BazaarService {
       reviewsByProvider: [...this.reviewsByProvider],
       favorites: [...this.favorites].map(([k, set]) => [k, [...set]] as [string, string[]]),
       favoriteCounts: [...this.favoriteCounts],
+      webhookSecrets: [...this.webhookSecrets],
     };
   }
 
@@ -764,6 +777,7 @@ export class BazaarService {
     fill(this.reviews, snap.reviews);
     fill(this.reviewsByProvider, snap.reviewsByProvider);
     fill(this.favoriteCounts, snap.favoriteCounts);
+    fill(this.webhookSecrets, snap.webhookSecrets ?? []);
     this.seenFunding.clear();
     for (const k of snap.seenFunding) this.seenFunding.add(k);
     this.favorites.clear();

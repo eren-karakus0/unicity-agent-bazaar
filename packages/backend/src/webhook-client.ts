@@ -1,18 +1,31 @@
+import crypto from 'node:crypto';
 import type { DeliveryChannel, ServiceInvocation, ServiceResult } from '@bazaar/core';
 
 /**
  * Dispatches a job to a provider agent and returns its result. Injected into the
  * BazaarService so the orchestration can be unit-tested without real network I/O.
+ * `secret` (when present) signs the request so the provider can verify the call.
  */
 export type Invoker = (
   channel: DeliveryChannel,
   invocation: ServiceInvocation,
+  secret?: string,
 ) => Promise<ServiceResult>;
+
+/**
+ * The signature the Bazaar attaches as `x-bazaar-signature: t=<ms>,v1=<hmac>`.
+ * HMAC-SHA256 over `<timestamp>.<rawBody>` — the same scheme agent-kit verifies
+ * (mirrors Stripe/GitHub webhook signing). A timestamp binds the signature to a
+ * moment so a captured request can't be replayed indefinitely.
+ */
+function webhookSignature(secret: string, timestamp: number, body: string): string {
+  return crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
+}
 
 /** The real invoker: POST the invocation to the provider's webhook. */
 export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
   const timeoutMs = opts?.timeoutMs ?? 20_000;
-  return async (channel, invocation) => {
+  return async (channel, invocation, secret) => {
     if (channel.kind !== 'webhook') {
       // Capsule dispatch is a planned second integration path.
       return { jobId: invocation.jobId, ok: false, error: `unsupported channel: ${channel.kind}` };
@@ -20,10 +33,16 @@ export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const body = JSON.stringify(invocation);
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (secret) {
+        const t = Date.now();
+        headers['x-bazaar-signature'] = `t=${t},v1=${webhookSignature(secret, t, body)}`;
+      }
       const res = await fetch(channel.url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(invocation),
+        headers,
+        body,
         signal: controller.signal,
       });
       if (!res.ok) {

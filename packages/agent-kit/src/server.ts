@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { ServiceInvocation, ServiceResult } from '@bazaar/core';
@@ -13,6 +14,43 @@ export interface AgentServerOptions {
   port?: number;
   /** Called with the actual bound port once listening. */
   onListening?: (port: number) => void;
+  /**
+   * The listing's webhook secret (from the publish response). When set, the
+   * server verifies each job's `x-bazaar-signature` and rejects unsigned or
+   * forged calls with 401 — so only the real Bazaar can invoke your agent.
+   */
+  secret?: string;
+}
+
+const DEFAULT_TOLERANCE_MS = 5 * 60_000;
+
+/**
+ * Verify a Bazaar webhook signature. The header is `t=<ms>,v1=<hmac>` and the
+ * signature is HMAC-SHA256 over `<t>.<rawBody>` — verify against the RAW request
+ * body (before JSON parsing). Rejects stale timestamps to bound replay.
+ */
+export function verifyWebhook(opts: {
+  secret: string;
+  rawBody: string;
+  signatureHeader?: string | string[] | null;
+  toleranceMs?: number;
+}): boolean {
+  const header = Array.isArray(opts.signatureHeader) ? opts.signatureHeader[0] : opts.signatureHeader;
+  if (!header) return false;
+  const parts: Record<string, string> = {};
+  for (const seg of header.split(',')) {
+    const [k, v] = seg.split('=');
+    if (k && v) parts[k.trim()] = v.trim();
+  }
+  const t = Number(parts.t);
+  const v1 = parts.v1;
+  if (!Number.isFinite(t) || !v1) return false;
+  const tolerance = opts.toleranceMs ?? DEFAULT_TOLERANCE_MS;
+  if (tolerance !== 0 && Math.abs(Date.now() - t) > tolerance) return false;
+  const expected = crypto.createHmac('sha256', opts.secret).update(`${t}.${opts.rawBody}`).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(v1);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 /** Run a handler against a raw invocation, producing a ServiceResult. Never throws. */
@@ -57,6 +95,18 @@ export function createAgentServer(opts: AgentServerOptions): http.Server {
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
+      // Verify the signature over the RAW body before trusting anything in it.
+      if (opts.secret) {
+        const ok = verifyWebhook({
+          secret: opts.secret,
+          rawBody: body,
+          signatureHeader: req.headers['x-bazaar-signature'],
+        });
+        if (!ok) {
+          send(res, 401, { ok: false, error: 'invalid or missing signature' });
+          return;
+        }
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(body || '{}');
