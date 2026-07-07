@@ -23,6 +23,7 @@ import { SphereAgent } from './sphere-agent.js';
 import { BazaarService, type BazaarSnapshot } from './bazaar-service.js';
 import { AuthService, principalOf, type Identity } from './auth.js';
 import { createHealthProber, createWebhookInvoker } from './webhook-client.js';
+import { startHouseAgents } from './house-agents.js';
 import { loadSnapshot, saveSnapshot } from './persist.js';
 
 const env = loadEnv();
@@ -74,9 +75,19 @@ async function boot(): Promise<void> {
   }
   const svcRef = service;
   setInterval(() => saveSnapshot(snapshotFile, svcRef.snapshot()), 10_000);
+
+  // First-party "house" agents: keep the marketplace live + dogfood the signed
+  // webhook path on every boot. Loopback-only, settled back to the escrow wallet.
+  const house = await startHouseAgents({
+    svc: service,
+    escrowChainPubkey: escrowAgent.chainPubkey,
+    portBase: env.port,
+    logger: createLogger('house'),
+  });
+
   const persistAndExit = () => {
     saveSnapshot(snapshotFile, svcRef.snapshot());
-    process.exit(0);
+    void house.stop().finally(() => process.exit(0));
   };
   process.once('SIGTERM', persistAndExit);
   process.once('SIGINT', persistAndExit);

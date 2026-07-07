@@ -245,6 +245,22 @@ export class BazaarService {
     return this.webhookSecrets.get(listingId);
   }
 
+  /**
+   * Insert or refresh a platform-owned ("house") listing with a known secret.
+   * Idempotent by listing id, so re-seeding on each boot keeps the same id while
+   * accumulated reviews/favorites (keyed separately) survive. Used to keep a
+   * couple of first-party agents always live and hireable.
+   */
+  seedListing(listing: Listing, owner: Identity, secret: string): void {
+    this.listings.set(listing.id, listing);
+    this.listingProviders.set(listing.id, owner);
+    this.webhookSecrets.set(listing.id, secret);
+    const principal = principalOf(owner);
+    if (!this.reputations.has(principal)) {
+      this.reputations.set(principal, newReputation(principal));
+    }
+  }
+
   /** The last recorded health of a listing's provider endpoint. */
   listingHealthOf(listingId: string): ListingHealth | undefined {
     return this.listingHealth.get(listingId);
