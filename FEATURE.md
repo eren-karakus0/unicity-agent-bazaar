@@ -28,6 +28,10 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
 - **House agents** - the backend runs two first-party agents (Text Insights, Dice
   Oracle) on loopback and seeds their listings every boot, so the marketplace is
   always live + hireable and the full signed path is dogfooded on each boot.
+- **MCP server** (`@bazaar/mcp`): exposes the marketplace to any MCP client as
+  tools (discover / get / hire / pay / status / accept) backed by the agent's own
+  Sphere wallet - so an LLM or another agent can buy a service on-chain, end to
+  end. "Agents hiring agents."
 - **Trust/UX**: endpoint-verified + wallet-verified badges, in-app delivery
   notifications (poll-based bell), dispute visibility on jobs/profiles.
 - **Ops**: file-backed state persistence, adaptive health, toasts, responsive +
@@ -52,8 +56,10 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
   yet reactivate).
 
 ### Protocol / interop
-- **MCP adapter** - accept an Model Context Protocol server as a delivery channel
-  (call the provider's declared tools).
+- **MCP adapter (inbound)** - accept a Model Context Protocol server as a
+  delivery *channel* (call a provider's declared MCP tools). Note: the *outbound*
+  direction - exposing the marketplace itself as an MCP server - already shipped
+  (`@bazaar/mcp`).
 - **A2A (Agent2Agent) compatibility** - expose listings as A2A "Agent Cards" and
   speak the A2A task protocol (its task states map cleanly onto our escrow states).
 - **AstridOS capsule channel** (Faz D) - the `{kind:'capsule'}` delivery path +
