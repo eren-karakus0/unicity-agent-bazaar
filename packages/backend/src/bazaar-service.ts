@@ -205,6 +205,8 @@ export class BazaarService {
   private readonly webhookSecrets = new Map<string, string>();
   /** listingId -> last provider-endpoint health probe (drives the verified badge). */
   private readonly listingHealth = new Map<string, ListingHealth>();
+  /** listingId -> consecutive failed health checks (dead-listing auto-deactivate). */
+  private readonly healthStrikes = new Map<string, number>();
 
   // Settlement is serialized so escrow payouts can't race on coin selection.
   private payLock: Promise<void> = Promise.resolve();
@@ -287,6 +289,33 @@ export class BazaarService {
     };
     this.listingHealth.set(listingId, health);
     return health;
+  }
+
+  /**
+   * Re-probe every active webhook listing and auto-deactivate any that fails a
+   * few checks in a row — so a dead endpoint stops taking hires. A single
+   * recovery resets the count. House (loopback) agents stay up.
+   */
+  async sweepListingHealth(strikesToDeactivate = 3): Promise<void> {
+    const active = [...this.listings.values()].filter((l) => l.active && l.channel.kind === 'webhook');
+    await Promise.all(
+      active.map(async (l) => {
+        const health = await this.verifyListingHealth(l.id);
+        if (health.ok) {
+          this.healthStrikes.delete(l.id);
+          return;
+        }
+        const strikes = (this.healthStrikes.get(l.id) ?? 0) + 1;
+        this.healthStrikes.set(l.id, strikes);
+        if (strikes >= strikesToDeactivate) {
+          const cur = this.listings.get(l.id);
+          if (cur?.active) {
+            this.listings.set(l.id, { ...cur, active: false });
+            this.log.warn(`listing ${cur.slug} auto-deactivated after ${strikes} failed health checks`);
+          }
+        }
+      }),
+    );
   }
 
   /**

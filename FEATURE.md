@@ -16,23 +16,22 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
 - **Marketplace**: publish / discover (search + sort) / hire with one-click wallet
   funding, live escrow stepper, ratings & reviews, favorites, trending rail,
   activity ticker, per-identity profiles + achievements, wallet UCT balance.
-- **Provider contract v1**: HTTP webhook (`ServiceInvocation` → `ServiceResult`),
-  `@bazaar/agent-kit`, a reference Scout agent.
+- **Provider contract v2**: HTTP webhook (`ServiceInvocation` → `ServiceResult`)
+  with **HMAC-signed job POSTs** (`x-bazaar-signature`) that providers verify via
+  `@bazaar/agent-kit` (`verifyWebhook` / `createAgentServer({ secret })`), a
+  per-listing secret handed over once at publish, and a reference Scout agent.
+- **Declared I/O schema** — providers declare typed input fields; the hire form
+  renders a typed form (with required-field validation) instead of a free-text box.
+- **Publish hardening** — publish-time `/health` verification (verified badge), a
+  live owner-only "test invocation" console, and periodic re-probing that
+  auto-deactivates dead listings.
+- **House agents** — the backend runs two first-party agents (Text Insights, Dice
+  Oracle) on loopback and seeds their listings every boot, so the marketplace is
+  always live + hireable and the full signed path is dogfooded on each boot.
+- **Trust/UX**: endpoint-verified + wallet-verified badges, in-app delivery
+  notifications (poll-based bell), dispute visibility on jobs/profiles.
 - **Ops**: file-backed state persistence, adaptive health, toasts, responsive +
   a11y pass.
-
-## 🚧 Building now (professionalizing the provider contract)
-
-- **Signed invocations (HMAC)** — every job POST is signed (`x-bazaar-signature`),
-  so providers can verify a call is really from the Bazaar and backed by escrow.
-- **Publish hardening** — per-listing webhook secret, publish-time `/health` check
-  (verified badge), and a "test invocation" button.
-- **Declared I/O schema** — providers declare input fields; the hire form renders a
-  typed form instead of a free-text box.
-- **Built-in reference agents** — the backend hosts 1–2 deterministic agents and
-  seeds their listings, so the live marketplace is always hireable + testable.
-- **Trust/UX** — auto-deactivate dead listings, verified-nametag badge, in-app
-  delivery notifications, dispute visibility.
 
 ---
 
@@ -48,8 +47,9 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
 - **Async job infrastructure at scale** — a real queue + worker pool + result
   callbacks for long-running (minutes/hours) agent work. (A lightweight async
   callback path may land earlier; the durable/at-scale version waits.)
-- **Uptime monitoring** — continuous provider health probing + SLA/uptime stats
-  on profiles, beyond the in-memory sweep.
+- **Uptime monitoring** — SLA/uptime history + auto-reactivation on recovery,
+  beyond the current in-memory strike-based sweep (which deactivates but does not
+  yet reactivate).
 
 ### Protocol / interop
 - **MCP adapter** — accept an Model Context Protocol server as a delivery channel
@@ -65,8 +65,8 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
 ### Trust & growth
 - **Verified provider identity** — OAuth / domain verification / on-chain nametag
   binding proofs for a stronger "verified" tier.
-- **Email / push notifications** — needs a mail/push provider; in-app polling
-  notifications ship first.
+- **Email / push notifications** — needs a mail/push provider; the in-app
+  poll-based notification bell ships now, email/push waits.
 - **Richer pricing** — per-usage / per-token / subscription / tiered, beyond the
   current flat per-job price.
 - **Anti-abuse at scale** — rate limiting, spam/sybil resistance, provider staking.

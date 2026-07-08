@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
+import { useNotifications } from './lib/notifications';
 import { go } from './lib/nav';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
@@ -89,6 +90,7 @@ export function App() {
             >
               publish agent
             </button>
+            <NotificationsBell />
             <AccountChip active={route.name === 'profile' && route.principal === null} />
           </nav>
         </div>
@@ -113,6 +115,84 @@ export function App() {
       </footer>
     </>
   );
+}
+
+function NotificationsBell() {
+  const { phase } = useAuth();
+  const { items, unread, markAllRead, clear } = useNotifications();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener('mousedown', onDoc);
+    return () => window.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  if (phase !== 'authenticated') return null;
+
+  const toggle = () => {
+    setOpen((o) => {
+      if (!o && unread > 0) markAllRead();
+      return !o;
+    });
+  };
+
+  return (
+    <div className="bell" ref={ref}>
+      <button
+        className={`bell__btn${unread > 0 ? ' bell__btn--alert' : ''}`}
+        onClick={toggle}
+        aria-label={`notifications${unread > 0 ? `, ${unread} unread` : ''}`}
+      >
+        🔔{unread > 0 && <span className="bell__count">{unread > 9 ? '9+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="bell__menu">
+          <div className="bell__head">
+            <span>Notifications</span>
+            {items.length > 0 && (
+              <button className="bell__clear" onClick={clear}>
+                clear
+              </button>
+            )}
+          </div>
+          {items.length === 0 ? (
+            <div className="bell__empty">You&rsquo;re all caught up.</div>
+          ) : (
+            <ul className="bell__list">
+              {items.map((n) => (
+                <li
+                  key={n.id}
+                  className="bell__item"
+                  onClick={() => {
+                    setOpen(false);
+                    go('/profile');
+                  }}
+                >
+                  <div className="bell__t">{n.title}</div>
+                  <div className="bell__b">{n.body}</div>
+                  <div className="bell__time">{timeAgo(n.at)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function timeAgo(at: number): string {
+  const s = Math.max(1, Math.round((Date.now() - at) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  return `${h}h ago`;
 }
 
 function AccountChip({ active }: { active: boolean }) {

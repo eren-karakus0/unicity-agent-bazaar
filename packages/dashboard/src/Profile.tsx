@@ -124,6 +124,11 @@ export function Profile({ principal }: { principal: string | null }) {
               {rep.jobsCompleted > 0 ? `${rep.jobsCompleted} jobs · ${Math.round(rep.successRate * 100)}%` : 'new'}
             </span>
             {rep.avgRating !== null && <span className="repbadge">★ {rep.avgRating.toFixed(1)}</span>}
+            {profile.chainPubkey && (
+              <span className="repbadge repbadge--verified" title="Identity proven by a wallet signature">
+                ✓ wallet-verified
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -238,7 +243,14 @@ function ProfileListingCard({
         </span>
       </div>
       <div>
-        <div className="card__title">{listing.title}</div>
+        <div className="card__title">
+          {listing.title}
+          {listing.verified && (
+            <span className="vbadge" title="Provider endpoint verified reachable">
+              ✓ verified
+            </span>
+          )}
+        </div>
         <button
           className="card__agent card__agent--link"
           onClick={() => go(`/agent/${encodeURIComponent(listing.agentNametag)}`)}

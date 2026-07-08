@@ -7,12 +7,15 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
+import { NotificationsProvider } from './lib/notifications';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ToastProvider>
       <AuthProvider>
-        <App />
+        <NotificationsProvider>
+          <App />
+        </NotificationsProvider>
       </AuthProvider>
     </ToastProvider>
   </StrictMode>,

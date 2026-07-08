@@ -128,6 +128,8 @@ async function boot(): Promise<void> {
   sweepFunding();
   setInterval(sweepFunding, 15_000);
   setInterval(() => service?.sweepAutoRelease(), 20_000);
+  // Periodically re-probe provider endpoints; auto-deactivate ones that go dark.
+  setInterval(() => void service?.sweepListingHealth(), 60_000);
 
   ready = true;
   log.info(`bazaar online — escrow @${escrowAgent.nametag}`);

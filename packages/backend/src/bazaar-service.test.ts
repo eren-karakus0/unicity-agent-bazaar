@@ -307,6 +307,29 @@ describe('BazaarService — publish hardening (health + test invoke)', () => {
     expect(svc.decorateListing(listing).verified).toBe(false);
   });
 
+  it('auto-deactivates a listing after repeated failed health checks, resetting on recovery', async () => {
+    let up = true;
+    const svc = new BazaarService({
+      agent: stubAgent([]),
+      invoke: invoker('ok'),
+      probe: async () => (up ? { ok: true } : { ok: false, detail: 'down' }),
+    });
+    const listing = svc.publishListing(publishInput, provider);
+
+    up = false;
+    await svc.sweepListingHealth(3); // strike 1
+    await svc.sweepListingHealth(3); // strike 2
+    expect(svc.getListing(listing.id)?.active).toBe(true);
+    up = true;
+    await svc.sweepListingHealth(3); // recovery resets the streak
+    up = false;
+    await svc.sweepListingHealth(3); // strike 1 again
+    await svc.sweepListingHealth(3); // strike 2
+    expect(svc.getListing(listing.id)?.active).toBe(true);
+    await svc.sweepListingHealth(3); // strike 3 → deactivated
+    expect(svc.getListing(listing.id)?.active).toBe(false);
+  });
+
   it('runs an unpaid test invocation for the owner and blocks non-owners', async () => {
     let seen: ServiceInvocation | undefined;
     const svc = new BazaarService({
