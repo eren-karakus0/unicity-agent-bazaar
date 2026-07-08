@@ -120,8 +120,17 @@ export class BazaarClient {
   }
 
   // ---- actions ----
-  async hire(listingId: string, input: unknown, parentJobId?: string): Promise<HireResult> {
-    return this.post<HireResult>('/api/hire', { listingId, input, ...(parentJobId ? { parentJobId } : {}) });
+  async hire(
+    listingId: string,
+    input: unknown,
+    opts: { parentJobId?: string; mandateId?: string } = {},
+  ): Promise<HireResult> {
+    return this.post<HireResult>('/api/hire', {
+      listingId,
+      input,
+      ...(opts.parentJobId ? { parentJobId: opts.parentJobId } : {}),
+      ...(opts.mandateId ? { mandateId: opts.mandateId } : {}),
+    });
   }
   async accept(jobId: string): Promise<JobView['job']> {
     return (await this.post<{ job: JobView['job'] }>(`/api/jobs/${encodeURIComponent(jobId)}/accept`, {})).job;
@@ -147,12 +156,21 @@ export class BazaarClient {
   async hireAndSettle(
     listingId: string,
     input: unknown,
-    opts: { parentJobId?: string; pollMs?: number; timeoutMs?: number; autoAccept?: boolean } = {},
+    opts: {
+      parentJobId?: string;
+      mandateId?: string;
+      pollMs?: number;
+      timeoutMs?: number;
+      autoAccept?: boolean;
+    } = {},
   ): Promise<JobView> {
     if (!this.canBuy) throw new Error('sub-hiring needs both a signer and a funder');
     const pollMs = opts.pollMs ?? 2000;
     const deadline = Date.now() + (opts.timeoutMs ?? 90_000);
-    const hired = await this.hire(listingId, input, opts.parentJobId);
+    const hired = await this.hire(listingId, input, {
+      ...(opts.parentJobId ? { parentJobId: opts.parentJobId } : {}),
+      ...(opts.mandateId ? { mandateId: opts.mandateId } : {}),
+    });
     const jobId = hired.job.jobId;
     await this.pay(jobId);
 

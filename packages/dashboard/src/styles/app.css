@@ -2819,6 +2819,166 @@ button {
   font-size: 12.5px;
 }
 
+/* ============================================================================
+   Delegations (spending mandates)
+   ============================================================================ */
+.dele-hero {
+  padding: 40px 0 8px;
+}
+.dele-hero__h {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  margin: 12px 0 0;
+}
+.dele-hero__sub {
+  margin-top: 14px;
+  max-width: 640px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+.dele {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  padding: 28px 0 80px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .dele {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+.dele-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: 22px;
+}
+.dele-form__row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.dele-form__row .field {
+  margin-bottom: 12px;
+}
+.dele-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.dele-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.mand {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.mand__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mand__state {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.mand__state--active {
+  color: var(--ok);
+  border-color: rgba(61, 220, 151, 0.4);
+  background: rgba(61, 220, 151, 0.08);
+}
+.mand__state--expired,
+.mand__state--gone {
+  color: var(--bad);
+  border-color: rgba(255, 93, 93, 0.4);
+  background: rgba(255, 93, 93, 0.07);
+}
+.mand__state--spent {
+  color: var(--warn);
+  border-color: rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.07);
+}
+.mand__id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: auto;
+}
+.mand__x {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.mand__x:hover {
+  color: var(--bad);
+  border-color: rgba(255, 93, 93, 0.4);
+}
+.mand__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.mand__grid span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.mand__grid b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.mand__bar {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.mand__bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange-lift), var(--brand-orange));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.mand__note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.mand__note code {
+  font-family: var(--font-mono);
+  color: var(--orange-lift);
+}
+
 /* ---- accessibility: honor reduced-motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *,

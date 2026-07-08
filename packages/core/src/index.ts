@@ -8,3 +8,4 @@ export * from './trending.js';
 export * from './achievements.js';
 export * from './receipt-proof.js';
 export * from './trust.js';
+export * from './mandate.js';

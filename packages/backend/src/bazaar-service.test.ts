@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DeliveryChannel, ServiceInvocation, ServiceResult } from '@bazaar/core';
-import { canonicalReceipt } from '@bazaar/core';
+import type { DeliveryChannel, ServiceInvocation, ServiceResult, SpendingMandate } from '@bazaar/core';
+import { canonicalMandate, canonicalReceipt } from '@bazaar/core';
 import { getPublicKey, signMessage, verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { BazaarService, type BazaarAgent, type PublishInput } from './bazaar-service.js';
 import type { Identity } from './auth.js';
@@ -494,5 +494,94 @@ describe('BazaarService - persistence', () => {
     // buyer authorization survives restore (jobParties persisted)
     const stranger: Identity = { chainPubkey: `02${'e'.repeat(64)}` };
     expect(fresh.reviewableByBuyer(hire.job.jobId, stranger)).toBe(false);
+  });
+});
+
+describe('BazaarService - spending mandates (delegated budgets)', () => {
+  const BUYER_PRIV = 'c'.repeat(64);
+  const BUYER_PUB = getPublicKey(BUYER_PRIV, true);
+  const AGENT_PRIV = 'e'.repeat(64);
+  const AGENT_PUB = getPublicKey(AGENT_PRIV, true);
+  const agentIdentity: Identity = { chainPubkey: AGENT_PUB, nametag: 'runner' };
+
+  const signedMandate = (over: Partial<SpendingMandate> = {}) => {
+    const mandate: SpendingMandate = {
+      v: 1,
+      mandateId: 'mand-1',
+      buyer: BUYER_PUB,
+      agent: AGENT_PUB,
+      maxTotalUct: 25,
+      maxPerJobUct: 10,
+      categories: ['*'],
+      expiresAt: Date.now() + 60_000,
+      createdAt: Date.now(),
+      ...over,
+    };
+    return { mandate, signature: signMessage(BUYER_PRIV, canonicalMandate(mandate)), signer: BUYER_PUB };
+  };
+
+  const withVerify = () =>
+    new BazaarService({ agent: stubAgent([]), invoke: invoker('ok'), verify: verifySignedMessage });
+
+  it('registers a validly signed mandate and reflects its budget', () => {
+    const svc = withVerify();
+    const m = svc.registerMandate(signedMandate());
+    const st = svc.mandateStatusOf(m.mandateId)!;
+    expect(st.remainingUct).toBe(25);
+    expect(st.active).toBe(true);
+  });
+
+  it('rejects a mandate whose signer is not the buyer', () => {
+    const svc = withVerify();
+    expect(() => svc.registerMandate({ ...signedMandate(), signer: AGENT_PUB })).toThrow(/signed by its buyer/);
+  });
+
+  it('rejects a tampered mandate (signature no longer verifies)', () => {
+    const svc = withVerify();
+    const signed = signedMandate();
+    expect(() =>
+      svc.registerMandate({ ...signed, mandate: { ...signed.mandate, maxTotalUct: 1000 } }),
+    ).toThrow(/does not verify/);
+  });
+
+  it('authorizes a hire within caps and debits the budget', () => {
+    const svc = withVerify();
+    const m = svc.registerMandate(signedMandate());
+    const listing = svc.publishListing(publishInput, provider); // priceUct 10
+    svc.hire({ listingId: listing.id, buyer: agentIdentity, mandateId: m.mandateId });
+    const st = svc.mandateStatusOf(m.mandateId)!;
+    expect(st.spentUct).toBe(10);
+    expect(st.jobs).toBe(1);
+    expect(st.remainingUct).toBe(15);
+  });
+
+  it('rejects a hire that exceeds the remaining budget', () => {
+    const svc = withVerify();
+    const m = svc.registerMandate(signedMandate({ maxTotalUct: 15 }));
+    const listing = svc.publishListing(publishInput, provider);
+    svc.hire({ listingId: listing.id, buyer: agentIdentity, mandateId: m.mandateId });
+    expect(() =>
+      svc.hire({ listingId: listing.id, buyer: agentIdentity, mandateId: m.mandateId }),
+    ).toThrow(/mandate rejected/);
+  });
+
+  it('rejects a hire from an agent the mandate does not name', () => {
+    const svc = withVerify();
+    const m = svc.registerMandate(signedMandate());
+    const listing = svc.publishListing(publishInput, provider);
+    const stranger: Identity = { chainPubkey: `02${'9'.repeat(64)}` };
+    expect(() =>
+      svc.hire({ listingId: listing.id, buyer: stranger, mandateId: m.mandateId }),
+    ).toThrow(/mandate rejected/);
+  });
+
+  it('round-trips mandate budget through snapshot/restore', () => {
+    const svc = withVerify();
+    const m = svc.registerMandate(signedMandate());
+    const listing = svc.publishListing(publishInput, provider);
+    svc.hire({ listingId: listing.id, buyer: agentIdentity, mandateId: m.mandateId });
+    const fresh = withVerify();
+    fresh.restore(JSON.parse(JSON.stringify(svc.snapshot())));
+    expect(fresh.mandateStatusOf(m.mandateId)!.spentUct).toBe(10);
   });
 });

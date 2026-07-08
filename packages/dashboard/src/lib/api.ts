@@ -196,6 +196,58 @@ export interface TrustScore {
   tier: Tier;
 }
 
+/** A buyer's signed authorization for an agent to hire on their behalf, capped. */
+export interface SpendingMandate {
+  v: 1;
+  mandateId: string;
+  buyer: string;
+  agent: string;
+  maxTotalUct: number;
+  maxPerJobUct: number;
+  categories: string[];
+  expiresAt: number;
+  createdAt: number;
+}
+export interface SignedMandate {
+  mandate: SpendingMandate;
+  signature: string;
+  signer: string;
+}
+export interface MandateStatus {
+  mandateId: string;
+  buyer: string;
+  agent: string;
+  maxTotalUct: number;
+  maxPerJobUct: number;
+  categories: string[];
+  spentUct: number;
+  remainingUct: number;
+  jobs: number;
+  expiresAt: number;
+  expired: boolean;
+  active: boolean;
+}
+
+/**
+ * The exact string a mandate is signed over. MUST byte-match
+ * `@bazaar/core`'s `canonicalMandate` (fixed field order, sorted categories),
+ * or the backend's signature check will reject it.
+ */
+export function canonicalMandate(m: SpendingMandate): string {
+  return JSON.stringify([
+    'bazaar-mandate',
+    m.v,
+    m.mandateId,
+    m.buyer,
+    m.agent,
+    m.maxTotalUct,
+    m.maxPerJobUct,
+    [...m.categories].sort().join(','),
+    m.expiresAt,
+    m.createdAt,
+  ]);
+}
+
 /** A listing/intent surfaced from Unicity's decentralized market feed. */
 export interface DiscoverItem {
   id: string;
@@ -334,6 +386,12 @@ export const api = {
     get<{ trust: TrustScore }>(`/api/trust/${encodeURIComponent(principal.replace(/^@/, ''))}`).then(
       (r) => r.trust,
     ),
+
+  // ---- spending mandates (delegated budgets) ----
+  registerMandate: (signed: SignedMandate) =>
+    post<{ mandate: SpendingMandate; status: MandateStatus }>('/api/mandates', signed),
+  mandateStatus: (id: string) =>
+    get<{ status: MandateStatus }>(`/api/mandates/${encodeURIComponent(id)}`).then((r) => r.status),
 
   // ---- Unicity decentralized market feed ----
   marketStatus: () => get<{ enabled: boolean; available: boolean }>('/api/market/status'),

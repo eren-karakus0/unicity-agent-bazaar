@@ -32,12 +32,17 @@ describe('BazaarClient', () => {
     expect((fetchImpl.mock.calls[3]![1] as RequestInit).headers).toMatchObject({ authorization: 'Bearer tok' });
   });
 
-  it('passes parentJobId through on hire (nested escrow lineage)', async () => {
+  it('passes parentJobId + mandateId through on hire', async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(jsonRes(200, { job: { jobId: 'child' } }));
     const c = new BazaarClient('http://api', { fetchImpl: fetchImpl as unknown as typeof fetch });
-    await c.hire('listingB', { x: 1 }, 'parentJob');
+    await c.hire('listingB', { x: 1 }, { parentJobId: 'parentJob', mandateId: 'mand-1' });
     const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
-    expect(body).toMatchObject({ listingId: 'listingB', input: { x: 1 }, parentJobId: 'parentJob' });
+    expect(body).toMatchObject({
+      listingId: 'listingB',
+      input: { x: 1 },
+      parentJobId: 'parentJob',
+      mandateId: 'mand-1',
+    });
   });
 
   it('hireAndSettle: hires, funds, waits for delivery, and accepts', async () => {

@@ -69,6 +69,7 @@ async function boot(): Promise<void> {
     invoke: createWebhookInvoker({ timeoutMs: 20_000 }),
     probe: createHealthProber({ timeoutMs: 5_000 }),
     autoReleaseMs: env.autoReleaseMs,
+    verify: verifySignedMessage,
     logger: createLogger('bazaar'),
   });
 
@@ -455,6 +456,7 @@ const server = http.createServer((req, res) => {
           buyer: identity,
           input: body.input,
           ...(str(body.parentJobId) ? { parentJobId: str(body.parentJobId) } : {}),
+          ...(str(body.mandateId) ? { mandateId: str(body.mandateId) } : {}),
         });
         json(res, 200, out);
       } catch (e) {
@@ -570,6 +572,42 @@ const server = http.createServer((req, res) => {
     }
     const decorated = svc.decorateListing(listing);
     json(res, 200, buildAgentCard(decorated, svc.trustOf(listing.agentNametag), baseUrlOf(req)));
+    return;
+  }
+
+  // ---- spending mandates (AP2-style delegated budgets) ----
+  if (pathname === '/api/mandates' && method === 'POST') {
+    void readJson(req).then((body) => {
+      try {
+        const signed = body as unknown as {
+          mandate?: unknown;
+          signature?: unknown;
+          signer?: unknown;
+        };
+        if (!signed.mandate || typeof signed.signature !== 'string' || typeof signed.signer !== 'string') {
+          json(res, 400, { error: 'expected { mandate, signature, signer }' });
+          return;
+        }
+        const mandate = svc.registerMandate({
+          mandate: signed.mandate as never,
+          signature: signed.signature,
+          signer: signed.signer,
+        });
+        json(res, 200, { mandate, status: svc.mandateStatusOf(mandate.mandateId) });
+      } catch (e) {
+        json(res, 400, { error: e instanceof Error ? e.message : 'could not register mandate' });
+      }
+    });
+    return;
+  }
+  const mandateMatch = pathname.match(/^\/api\/mandates\/([^/]+)$/);
+  if (mandateMatch && method === 'GET') {
+    const status = svc.mandateStatusOf(decodeURIComponent(mandateMatch[1]!));
+    if (!status) {
+      json(res, 404, { error: 'no such mandate' });
+      return;
+    }
+    json(res, 200, { status });
     return;
   }
 

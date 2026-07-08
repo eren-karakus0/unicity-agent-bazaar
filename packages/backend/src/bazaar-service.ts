@@ -2,7 +2,9 @@ import {
   applyEscrowEvent,
   applyOutcome,
   applyRating,
+  canonicalMandate,
   canonicalReceipt,
+  checkMandate,
   clampStars,
   earnedAchievements,
   hotScore,
@@ -18,13 +20,16 @@ import {
   type EscrowState,
   type Listing,
   type ListingInput,
+  type MandateStatus,
   type Reputation,
   type ReputationView,
   type Review,
   type ServiceInvocation,
   type ServiceResult,
   type SettlementReceipt,
+  type SignedMandate,
   type SignedReceipt,
+  type SpendingMandate,
   type TrustScore,
 } from '@bazaar/core';
 import crypto from 'node:crypto';
@@ -124,6 +129,9 @@ export interface BazaarSnapshot {
   favoriteCounts: [string, number][];
   webhookSecrets: [string, string][];
   listingHealth: [string, ListingHealth][];
+  mandates?: [string, SpendingMandate][];
+  mandateSpent?: [string, { spent: number; jobs: number }][];
+  jobMandate?: [string, string][];
 }
 
 /** The minimal on-chain surface the service needs - satisfied by SphereAgent. */
@@ -146,6 +154,8 @@ export interface BazaarServiceOptions {
   probe?: HealthProber;
   /** How long a delivered job waits before auto-releasing to the provider. */
   autoReleaseMs?: number;
+  /** Verify a secp256k1 signed message (for spending mandates). Absent → mandates disabled. */
+  verify?: (message: string, signature: string, pubkey: string) => boolean;
   logger?: Logger;
 }
 
@@ -195,6 +205,7 @@ export class BazaarService {
   private readonly invoke: Invoker;
   private readonly probe: HealthProber;
   private readonly autoReleaseMs: number;
+  private readonly verify?: (message: string, signature: string, pubkey: string) => boolean;
   private readonly log: Logger;
 
   private readonly listings = new Map<string, Listing>();
@@ -230,6 +241,12 @@ export class BazaarService {
   private readonly listingHealth = new Map<string, ListingHealth>();
   /** listingId -> consecutive failed health checks (dead-listing auto-deactivate). */
   private readonly healthStrikes = new Map<string, number>();
+  /** mandateId -> a buyer's signed spending authorization for an agent. */
+  private readonly mandates = new Map<string, SpendingMandate>();
+  /** mandateId -> budget consumed so far { spent, jobs }. */
+  private readonly mandateSpent = new Map<string, { spent: number; jobs: number }>();
+  /** jobId -> the mandate a hire was authorized under (if any). */
+  private readonly jobMandate = new Map<string, string>();
 
   // Settlement is serialized so escrow payouts can't race on coin selection.
   private payLock: Promise<void> = Promise.resolve();
@@ -241,7 +258,64 @@ export class BazaarService {
     this.invoke = opts.invoke;
     this.probe = opts.probe ?? createHealthProber();
     this.autoReleaseMs = opts.autoReleaseMs ?? 2 * 60_000;
+    this.verify = opts.verify;
     this.log = opts.logger ?? createLogger('bazaar');
+  }
+
+  // ---- spending mandates (AP2-style delegated budgets) ----
+
+  /**
+   * Register a buyer's signed spending mandate after verifying the signature.
+   * The signer MUST be the mandate's buyer, and the mandate must not be expired.
+   * This is authorization + a platform-enforced cap, never custody of funds.
+   */
+  registerMandate(signed: SignedMandate): SpendingMandate {
+    const { mandate, signature, signer } = signed;
+    if (!this.verify) throw new Error('mandates are not enabled on this server');
+    if (mandate.v !== 1) throw new Error('unsupported mandate version');
+    if (toPrincipal(signer) !== toPrincipal(mandate.buyer)) {
+      throw new Error('mandate must be signed by its buyer');
+    }
+    if (!/^0[23][0-9a-fA-F]{64}$/.test(mandate.agent)) {
+      throw new Error('mandate agent must be a chain pubkey');
+    }
+    if (mandate.maxTotalUct <= 0 || mandate.maxPerJobUct <= 0) {
+      throw new Error('mandate caps must be positive');
+    }
+    if (mandate.expiresAt <= Date.now()) throw new Error('mandate is already expired');
+    if (!this.verify(canonicalMandate(mandate), signature, signer)) {
+      throw new Error('mandate signature does not verify');
+    }
+    this.mandates.set(mandate.mandateId, mandate);
+    if (!this.mandateSpent.has(mandate.mandateId)) {
+      this.mandateSpent.set(mandate.mandateId, { spent: 0, jobs: 0 });
+    }
+    this.log.info(
+      `mandate ${mandate.mandateId.slice(0, 10)}… registered: ${mandate.buyer.slice(0, 10)}… authorizes ` +
+        `${mandate.agent.slice(0, 10)}… up to ${mandate.maxTotalUct} UCT`,
+    );
+    return mandate;
+  }
+
+  mandateStatusOf(mandateId: string): MandateStatus | undefined {
+    const m = this.mandates.get(mandateId);
+    if (!m) return undefined;
+    const used = this.mandateSpent.get(mandateId) ?? { spent: 0, jobs: 0 };
+    const expired = Date.now() >= m.expiresAt;
+    return {
+      mandateId: m.mandateId,
+      buyer: m.buyer,
+      agent: m.agent,
+      maxTotalUct: m.maxTotalUct,
+      maxPerJobUct: m.maxPerJobUct,
+      categories: m.categories,
+      spentUct: used.spent,
+      remainingUct: Math.max(0, m.maxTotalUct - used.spent),
+      jobs: used.jobs,
+      expiresAt: m.expiresAt,
+      expired,
+      active: !expired && used.spent < m.maxTotalUct,
+    };
   }
 
   // ---- registry ----
@@ -377,7 +451,13 @@ export class BazaarService {
   // ---- hire + funding ----
 
   /** Open an escrow for a listing and return the buyer's payment instructions. */
-  hire(input: { listingId: string; buyer: Identity; input?: unknown; parentJobId?: string }): HireResult {
+  hire(input: {
+    listingId: string;
+    buyer: Identity;
+    input?: unknown;
+    parentJobId?: string;
+    mandateId?: string;
+  }): HireResult {
     const listing = this.listings.get(input.listingId);
     if (!listing || !listing.active) throw new Error('unknown or inactive listing');
     const buyerPrincipal = principalOf(input.buyer);
@@ -387,6 +467,21 @@ export class BazaarService {
     };
     if (provider.chainPubkey && provider.chainPubkey === input.buyer.chainPubkey) {
       throw new Error('you cannot hire your own listing');
+    }
+    // Delegated spend: if this hire cites a mandate, the caller is the authorized
+    // agent and must stay within the buyer's signed budget/category/expiry caps.
+    if (input.mandateId) {
+      const mandate = this.mandates.get(input.mandateId);
+      if (!mandate) throw new Error('unknown spending mandate');
+      const used = this.mandateSpent.get(input.mandateId) ?? { spent: 0, jobs: 0 };
+      const gate = checkMandate(
+        mandate,
+        used.spent,
+        input.buyer.chainPubkey ?? '',
+        listing.priceUct,
+        listing.category,
+      );
+      if (!gate.ok) throw new Error(`mandate rejected this hire: ${gate.reason}`);
     }
     const job = openEscrow({
       listingId: listing.id,
@@ -407,6 +502,16 @@ export class BazaarService {
       kids.push(job.jobId);
       this.jobChildren.set(input.parentJobId, kids);
       this.log.info(`job ${job.jobId} sub-hired under parent ${input.parentJobId}`);
+    }
+    // Debit the mandate's budget once the hire is admitted.
+    if (input.mandateId && this.mandates.has(input.mandateId)) {
+      const used = this.mandateSpent.get(input.mandateId) ?? { spent: 0, jobs: 0 };
+      this.mandateSpent.set(input.mandateId, {
+        spent: used.spent + job.amountUct,
+        jobs: used.jobs + 1,
+      });
+      this.jobMandate.set(job.jobId, input.mandateId);
+      this.log.info(`job ${job.jobId} charged to mandate ${input.mandateId.slice(0, 10)}…`);
     }
     this.log.info(`hired ${listing.slug}: job ${job.jobId} quoted at ${job.amountUct} UCT`);
     return {
@@ -968,6 +1073,9 @@ export class BazaarService {
       favoriteCounts: [...this.favoriteCounts],
       webhookSecrets: [...this.webhookSecrets],
       listingHealth: [...this.listingHealth],
+      mandates: [...this.mandates],
+      mandateSpent: [...this.mandateSpent],
+      jobMandate: [...this.jobMandate],
     };
   }
 
@@ -993,6 +1101,9 @@ export class BazaarService {
     fill(this.favoriteCounts, snap.favoriteCounts);
     fill(this.webhookSecrets, snap.webhookSecrets ?? []);
     fill(this.listingHealth, snap.listingHealth ?? []);
+    fill(this.mandates, snap.mandates ?? []);
+    fill(this.mandateSpent, snap.mandateSpent ?? []);
+    fill(this.jobMandate, snap.jobMandate ?? []);
     fill(this.jobParent, snap.jobParent ?? []);
     // Rebuild the parent -> children index from the child -> parent map.
     this.jobChildren.clear();

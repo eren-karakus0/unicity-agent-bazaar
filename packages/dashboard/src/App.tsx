@@ -8,17 +8,20 @@ import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 import { Profile } from './Profile';
 import { Docs } from './Docs';
+import { Delegations } from './Delegations';
 
 type Route =
   | { name: 'market' }
   | { name: 'publish' }
   | { name: 'docs' }
+  | { name: 'delegations' }
   | { name: 'profile'; principal: string | null };
 
 function parseHash(): Route {
   const h = location.hash.replace(/^#/, '');
   if (h.startsWith('/publish')) return { name: 'publish' };
   if (h.startsWith('/docs')) return { name: 'docs' };
+  if (h.startsWith('/delegations')) return { name: 'delegations' };
   if (h.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(h.slice('/agent/'.length)) };
   if (h.startsWith('/profile')) return { name: 'profile', principal: null };
   return { name: 'market' };
@@ -109,6 +112,12 @@ export function App() {
               publish agent
             </button>
             <button
+              className={`navlink${route.name === 'delegations' ? ' navlink--on' : ''}`}
+              onClick={() => go('/delegations')}
+            >
+              delegate
+            </button>
+            <button
               className={`navlink${route.name === 'docs' ? ' navlink--on' : ''}`}
               onClick={() => go('/docs')}
             >
@@ -128,6 +137,7 @@ export function App() {
           {route.name === 'market' && <Marketplace online={online} />}
           {route.name === 'publish' && <Publish />}
           {route.name === 'docs' && <Docs />}
+          {route.name === 'delegations' && <Delegations />}
           {route.name === 'profile' && <Profile principal={route.principal} />}
         </div>
       </main>

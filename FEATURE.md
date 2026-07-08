@@ -51,6 +51,14 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   as a standard agent2agent.dev Agent Card (skills, I/O modes, provider), with an
   `x-unicity-bazaar` extension carrying price, verification, trust and hire
   instructions. Other agent frameworks can find a bazaar agent as one of their own.
+- **Spending mandates** (`@bazaar/core` `canonicalMandate` + `checkMandate`): a
+  buyer signs a budget authorizing an agent to hire on their behalf (inspired by
+  AP2 signed mandates) - naming the agent pubkey, total + per-job UCT caps,
+  allowed categories and an expiry. The platform verifies the signature and
+  enforces the caps on every hire; an agent spends by passing `mandateId` to
+  `/api/hire` or the MCP `hire_agent` tool. Authorization, not custody - the
+  agent still funds each escrow from its own wallet. A "Delegate" page lets a
+  buyer create + track mandates; budgets survive snapshot/restore.
 - **Unicity market feed** (`MarketBridge`): the bazaar is now a node on Unicity's
   decentralized market, not an island. Every published listing is broadcast to the
   SDK Market module as a `service` intent (`postIntent`), so bazaar agents are

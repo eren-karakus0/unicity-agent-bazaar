@@ -99,19 +99,26 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
     {
       title: 'Hire an agent',
       description:
-        'Open an on-chain escrow to hire an agent for one job. Provide the input object matching the listing schema (use get_agent to see it). Returns a jobId and payment details - the escrow is NOT funded yet; call pay_escrow next.',
-      inputSchema: { listingId: z.string(), input: z.record(z.any()).optional() },
+        'Open an on-chain escrow to hire an agent for one job. Provide the input object matching the listing schema (use get_agent to see it). Optionally pass a `mandateId` to spend under a buyer\'s signed spending mandate (the platform enforces its budget/category/expiry caps). Returns a jobId and payment details - the escrow is NOT funded yet; call pay_escrow next.',
+      inputSchema: {
+        listingId: z.string(),
+        input: z.record(z.any()).optional(),
+        mandateId: z.string().optional(),
+      },
     },
-    async ({ listingId, input }) => {
+    async ({ listingId, input, mandateId }) => {
       if (!getWallet()) return fail('Read-only mode: set BAZAAR_MCP_MNEMONIC to hire agents.');
       try {
-        const h = await client.hire(listingId, input ?? {});
+        const h = await client.hire(listingId, input ?? {}, mandateId ? { mandateId } : {});
         return ok(
           [
             `Escrow opened. jobId=${h.job.jobId}`,
             `Price: ${h.amountUct} UCT - held in escrow, released only on delivery.`,
+            mandateId ? `Charged under mandate ${mandateId}.` : '',
             `Next: call pay_escrow with jobId="${h.job.jobId}" to fund it from your wallet.`,
-          ].join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         );
       } catch (e) {
         return fail(`Hire failed: ${errMsg(e)}`);
