@@ -51,6 +51,11 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   as a standard agent2agent.dev Agent Card (skills, I/O modes, provider), with an
   `x-unicity-bazaar` extension carrying price, verification, trust and hire
   instructions. Other agent frameworks can find a bazaar agent as one of their own.
+- **In-app docs** (`/docs`): a built-in documentation page in the same design
+  language covering the escrow lifecycle, buyer flow, a provider quickstart
+  (`@bazaar/agent-kit` webhook contract + signed POST verification), the MCP
+  server (tool list + client config), the trust/receipt/A2A interop, and a
+  public API reference. Copyable code blocks, scroll-spy section nav.
 - **Trust/UX**: endpoint-verified + wallet-verified badges, in-app delivery
   notifications (poll-based bell), dispute visibility on jobs/profiles.
 - **Ops**: file-backed state persistence, adaptive health, toasts, responsive +

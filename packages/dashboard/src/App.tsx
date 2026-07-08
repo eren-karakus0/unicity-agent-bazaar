@@ -7,15 +7,18 @@ import { LogoMark } from './Logo';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 import { Profile } from './Profile';
+import { Docs } from './Docs';
 
 type Route =
   | { name: 'market' }
   | { name: 'publish' }
+  | { name: 'docs' }
   | { name: 'profile'; principal: string | null };
 
 function parseHash(): Route {
   const h = location.hash.replace(/^#/, '');
   if (h.startsWith('/publish')) return { name: 'publish' };
+  if (h.startsWith('/docs')) return { name: 'docs' };
   if (h.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(h.slice('/agent/'.length)) };
   if (h.startsWith('/profile')) return { name: 'profile', principal: null };
   return { name: 'market' };
@@ -105,6 +108,12 @@ export function App() {
             >
               publish agent
             </button>
+            <button
+              className={`navlink${route.name === 'docs' ? ' navlink--on' : ''}`}
+              onClick={() => go('/docs')}
+            >
+              docs
+            </button>
             <NotificationsBell />
             <AccountChip active={route.name === 'profile' && route.principal === null} />
           </nav>
@@ -118,6 +127,7 @@ export function App() {
         >
           {route.name === 'market' && <Marketplace online={online} />}
           {route.name === 'publish' && <Publish />}
+          {route.name === 'docs' && <Docs />}
           {route.name === 'profile' && <Profile principal={route.principal} />}
         </div>
       </main>
@@ -126,7 +136,13 @@ export function App() {
         <span>
           <b>Unicity Agent Bazaar</b> - hire an agent, pay on delivery.
         </span>
-        <span>escrow-settled on testnet2 · SDK-only · $0</span>
+        <span className="foot__links">
+          <button className="foot__link" onClick={() => go('/docs')}>
+            docs
+          </button>
+          <span className="foot__sep">·</span>
+          escrow-settled on testnet2 · SDK-only · $0
+        </span>
       </footer>
     </>
   );
