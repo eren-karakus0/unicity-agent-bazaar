@@ -66,6 +66,10 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   network search (`getRecentListings` / `search`) back into our own discovery.
   Fully best-effort: a relay hiccup or a disabled module degrades to empty and
   never blocks publish or hire. Toggle with `BAZAAR_MARKET` (default on).
+- **Acquire-UCT peer rates**: the hire dialog surfaces live "1 UCT ≈ X USDC"
+  rates aggregated from maker sell-offers on the same market feed
+  (`/api/market/rates`), so a buyer short on UCT sees where to get it. Honest
+  discovery of real peer offers - not an automated swap.
 - **In-app docs** (`/docs`): a built-in documentation page in the same design
   language covering the escrow lifecycle, buyer flow, a provider quickstart
   (`@bazaar/agent-kit` webhook contract + signed POST verification), the MCP

@@ -248,6 +248,13 @@ export function canonicalMandate(m: SpendingMandate): string {
   ]);
 }
 
+/** A live "acquire UCT" rate aggregated from maker sell-offers on the feed. */
+export interface UctRate {
+  currency: string;
+  pricePerUct: number;
+  offers: number;
+}
+
 /** A listing/intent surfaced from Unicity's decentralized market feed. */
 export interface DiscoverItem {
   id: string;
@@ -399,6 +406,7 @@ export const api = {
     get<{ items: DiscoverItem[]; available: boolean }>(`/api/market/feed?n=${n}`),
   marketSearch: (q: string) =>
     get<{ items: DiscoverItem[]; available: boolean }>(`/api/market/search?q=${encodeURIComponent(q)}`),
+  marketRates: () => get<{ rates: UctRate[]; available: boolean }>('/api/market/rates'),
 };
 
 /** Absolute URL of the self-contained trust badge SVG for a principal (embeddable anywhere). */

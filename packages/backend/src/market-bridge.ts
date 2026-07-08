@@ -31,6 +31,23 @@ export interface DiscoverItem {
   source: 'unicity';
 }
 
+/** A live "acquire UCT" rate aggregated from maker sell-offers on the feed. */
+export interface UctRate {
+  /** Quote currency you'd pay in (e.g. USDC, USDU). */
+  currency: string;
+  /** Best (lowest) quote-currency price for 1 UCT across current offers. */
+  pricePerUct: number;
+  /** How many live offers back this currency. */
+  offers: number;
+}
+
+/** The subset of a market intent the rate aggregator reads. */
+export interface RateIntent {
+  intentType: string;
+  price?: number;
+  currency?: string;
+}
+
 export interface MarketBridgeOptions {
   /** Lazy accessor so the bridge tolerates the module appearing/disappearing. */
   market: () => MarketModule | null;
@@ -156,6 +173,44 @@ export class MarketBridge {
       this.log.warn(`search unavailable: ${errMsg(e)}`);
       return [];
     }
+  }
+
+  /**
+   * Live "acquire UCT" rates: makers on the network posting to SELL UCT are
+   * exactly who a buyer short on UCT would buy from. We surface their offers as
+   * peer rates (aggregated to the best price per currency) - honest discovery,
+   * not an automated swap. Empty on any failure.
+   */
+  async rates(limit = 6): Promise<UctRate[]> {
+    const m = this.getMarket();
+    if (!m) return [];
+    try {
+      const res = await m.search('sell UCT', { limit: 40 });
+      return MarketBridge.aggregateRates(res.intents).slice(0, limit);
+    } catch (e) {
+      this.log.warn(`rates unavailable: ${errMsg(e)}`);
+      return [];
+    }
+  }
+
+  /**
+   * Pure: aggregate maker SELL intents into a best-price-per-currency table.
+   * Only `sell` intents with a positive price and a currency count (those are
+   * the offers a UCT buyer can take).
+   */
+  static aggregateRates(intents: RateIntent[]): UctRate[] {
+    const best = new Map<string, { price: number; offers: number }>();
+    for (const i of intents) {
+      if (i.intentType !== 'sell') continue;
+      if (typeof i.price !== 'number' || !(i.price > 0) || !i.currency) continue;
+      const cur = i.currency.toUpperCase();
+      const cur0 = best.get(cur);
+      if (!cur0) best.set(cur, { price: i.price, offers: 1 });
+      else best.set(cur, { price: Math.min(cur0.price, i.price), offers: cur0.offers + 1 });
+    }
+    return [...best.entries()]
+      .map(([currency, v]) => ({ currency, pricePerUct: v.price, offers: v.offers }))
+      .sort((a, b) => b.offers - a.offers || a.currency.localeCompare(b.currency));
   }
 
   /** Pure: a feed row -> DiscoverItem. */

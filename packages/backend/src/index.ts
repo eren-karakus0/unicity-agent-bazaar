@@ -630,6 +630,12 @@ const server = http.createServer((req, res) => {
     );
     return;
   }
+  if (pathname === '/api/market/rates' && method === 'GET') {
+    void (market?.rates() ?? Promise.resolve([])).then((rates) =>
+      json(res, 200, { rates, available: market?.available ?? false }),
+    );
+    return;
+  }
 
   json(res, 404, { error: 'not found' });
 });

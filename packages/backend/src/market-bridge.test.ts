@@ -68,6 +68,24 @@ describe('MarketBridge.fromFeed / fromIntent', () => {
     expect(d.source).toBe('unicity');
   });
 
+  it('aggregates sell-UCT offers to the best price per currency', () => {
+    const intents = [
+      { intentType: 'sell', price: 1.05, currency: 'USDC' },
+      { intentType: 'sell', price: 0.99, currency: 'usdc' }, // cheaper, case-normalized
+      { intentType: 'sell', price: 3, currency: 'USDU' },
+      { intentType: 'buy', price: 0.5, currency: 'USDC' }, // ignored (buy)
+      { intentType: 'sell', price: 0, currency: 'USDC' }, // ignored (non-positive)
+      { intentType: 'sell', price: 2, currency: undefined }, // ignored (no currency)
+    ];
+    const rates = MarketBridge.aggregateRates(intents);
+    const usdc = rates.find((r) => r.currency === 'USDC')!;
+    expect(usdc.pricePerUct).toBe(0.99);
+    expect(usdc.offers).toBe(2);
+    expect(rates.find((r) => r.currency === 'USDU')!.pricePerUct).toBe(3);
+    // USDC (2 offers) ranks before USDU (1 offer)
+    expect(rates[0]!.currency).toBe('USDC');
+  });
+
   it('falls back to now for an unparseable date', () => {
     const f: FeedRow = {
       id: 'i3',

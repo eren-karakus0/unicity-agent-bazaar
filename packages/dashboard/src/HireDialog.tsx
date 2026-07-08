@@ -8,6 +8,7 @@ import {
   type Listing,
   type Review,
   type SignedReceipt,
+  type UctRate,
 } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
@@ -193,6 +194,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                     One click opens your wallet to approve the transfer - the memo is attached automatically. Or
                     send {hire.amountUct} UCT to {hire.payTo} manually with the memo above.
                   </div>
+                  <UctRates />
                 </>
               )}
 
@@ -509,6 +511,45 @@ function ReviewBlock({
       <button className="btn btn--primary btn--sm" disabled={busy} onClick={submit}>
         {busy ? 'posting…' : 'Post review'}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Short on UCT? Surface live peer offers to acquire it, pulled from Unicity's
+ * decentralized market feed. These are real maker offers on the open network,
+ * not an automated swap - honest "pay in any token" discovery.
+ */
+function UctRates() {
+  const [rates, setRates] = useState<UctRate[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .marketRates()
+      .then((r) => live && setRates(r.rates))
+      .catch(() => live && setRates([]));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!rates || rates.length === 0) return null;
+  return (
+    <div className="uctrates">
+      <div className="uctrates__h">
+        <span className="netsrc__hex">⬡</span> Short on UCT? Live peer offers on Unicity
+      </div>
+      <div className="uctrates__list">
+        {rates.map((r) => (
+          <span className="uctrate" key={r.currency}>
+            1 UCT ≈ <b>{r.pricePerUct}</b> {r.currency}
+            <em>{r.offers} offer{r.offers === 1 ? '' : 's'}</em>
+          </span>
+        ))}
+      </div>
+      <div className="uctrates__note">
+        Peer offers on the open market feed - contact a maker to swap, then fund the escrow above.
+      </div>
     </div>
   );
 }

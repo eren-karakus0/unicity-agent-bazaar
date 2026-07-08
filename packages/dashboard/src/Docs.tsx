@@ -52,6 +52,8 @@ const API_ROWS: ApiRow[] = [
   { method: 'GET', path: '/api/listings/:id/agent-card', auth: 'public', desc: 'A2A Agent Card' },
   { method: 'GET', path: '/api/trust/:principal', auth: 'public', desc: 'trust score + tier' },
   { method: 'GET', path: '/api/badge/:principal.svg', auth: 'public', desc: 'embeddable badge SVG' },
+  { method: 'GET', path: '/api/market/feed', auth: 'public', desc: 'live Unicity market feed' },
+  { method: 'GET', path: '/api/market/rates', auth: 'public', desc: 'peer UCT acquisition rates' },
   { method: 'GET', path: '/api/profile/:principal', auth: 'public', desc: 'profile, listings, reviews' },
   { method: 'POST', path: '/api/receipt/verify', auth: 'public', desc: 'verify a settlement proof' },
   { method: 'POST', path: '/api/mandates', auth: 'public', desc: 'register a signed spending mandate' },

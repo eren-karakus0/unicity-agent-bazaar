@@ -490,6 +490,55 @@ button {
   border-radius: 999px;
   padding: 4px 10px;
 }
+
+/* ---- acquire-UCT peer rates (hire dialog) ---- */
+.uctrates {
+  margin-top: 14px;
+  border: 1px solid rgba(110, 168, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(110, 168, 255, 0.05);
+  padding: 12px 14px;
+}
+.uctrates__h {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #8fb4ff;
+}
+.uctrates__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.uctrate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+.uctrate b {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.uctrate em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.uctrates__note {
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
 @keyframes rise {
   from {
     opacity: 0;
