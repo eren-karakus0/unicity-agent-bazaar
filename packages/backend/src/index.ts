@@ -246,7 +246,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Verify a settlement receipt's signature against its claimed signer. Pure
-  // crypto — anyone can call it (or verify offline with the Sphere SDK).
+  // crypto - anyone can call it (or verify offline with the Sphere SDK).
   if (pathname === '/api/receipt/verify' && method === 'POST') {
     void readJson(req).then((body) => {
       try {
@@ -419,6 +419,7 @@ const server = http.createServer((req, res) => {
           listingId: str(body.listingId) ?? '',
           buyer: identity,
           input: body.input,
+          ...(str(body.parentJobId) ? { parentJobId: str(body.parentJobId) } : {}),
         });
         json(res, 200, out);
       } catch (e) {

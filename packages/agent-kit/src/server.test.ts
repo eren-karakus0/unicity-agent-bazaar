@@ -30,6 +30,12 @@ describe('runInvocation', () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe('boom');
   });
+
+  it('passes the context (e.g. a bazaar client to sub-hire) to the handler', async () => {
+    const bazaar = { marker: true } as never;
+    const r = await runInvocation((_i, ctx) => ({ gotBazaar: ctx.bazaar === bazaar }), inv(1), { bazaar });
+    expect(r.output).toEqual({ gotBazaar: true });
+  });
 });
 
 describe('verifyWebhook', () => {

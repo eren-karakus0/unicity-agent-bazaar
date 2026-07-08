@@ -139,6 +139,8 @@ export interface JobView {
   settlement?: Settlement;
   review?: Review;
   receipt?: SignedReceipt;
+  parentJobId?: string;
+  children?: string[];
 }
 
 export interface ReputationView {

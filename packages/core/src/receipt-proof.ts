@@ -1,10 +1,10 @@
 /**
- * Settlement receipts — the bazaar's proof that a job settled, and how.
+ * Settlement receipts - the bazaar's proof that a job settled, and how.
  *
  * When an escrow releases or refunds, the platform signs a canonical statement
  * of the outcome with the escrow wallet's key. Anyone can later verify that
  * signature against the escrow's public chain key (with the Sphere SDK's
- * `verifySignedMessage`) — so a settlement is independently provable and
+ * `verifySignedMessage`) - so a settlement is independently provable and
  * non-repudiable, not "trust the API". The receipt also carries the on-chain
  * settlement `txId`, tying the attestation to the Unicity ledger entry.
  *

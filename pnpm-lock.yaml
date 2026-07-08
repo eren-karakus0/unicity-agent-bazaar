@@ -141,6 +141,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@bazaar/agent-kit':
+        specifier: workspace:*
+        version: link:../agent-kit
       '@bazaar/core':
         specifier: workspace:*
         version: link:../core

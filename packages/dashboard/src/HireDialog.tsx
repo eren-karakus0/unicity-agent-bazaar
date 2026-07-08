@@ -263,6 +263,14 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                   }}
                 />
               )}
+              {(jobv?.children?.length || jobv?.parentJobId) && (
+                <div className="lineage">
+                  <span className="lineage__i">⑃</span>
+                  {jobv?.children?.length
+                    ? `This agent sub-hired ${jobv.children.length} other agent${jobv.children.length > 1 ? 's' : ''} to complete the job (nested escrow).`
+                    : 'This job is part of a larger job that sub-hired it.'}
+                </div>
+              )}
               {jobv?.receipt && <ReceiptBlock signed={jobv.receipt} />}
               {(state === 'released' || terminalBad) && (
                 <div className="dialog__actions">
@@ -408,7 +416,7 @@ function ReceiptBlock({ signed }: { signed: SignedReceipt }) {
                 : 'Verify signature'}
         </button>
         <span className="receiptbox__note">
-          signed by the escrow wallet — anyone can verify it offline with the Sphere SDK.
+          signed by the escrow wallet - anyone can verify it offline with the Sphere SDK.
         </span>
       </div>
     </div>

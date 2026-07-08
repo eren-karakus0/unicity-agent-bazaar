@@ -114,6 +114,7 @@ export interface BazaarSnapshot {
   listingProviders: [string, Identity][];
   jobParties: [string, { buyer: Identity; provider: Identity }][];
   escrowIndex: [string, string][];
+  jobParent: [string, string][];
   seenFunding: string[];
   reviews: [string, Review][];
   reviewsByProvider: [string, string[]][];
@@ -129,7 +130,7 @@ export interface BazaarAgent {
   readonly uctCoin: { coinId: string; decimals: number };
   send(recipient: string, human: string | number, memo?: string): Promise<unknown>;
   toHuman(smallest: bigint | string): string;
-  /** The escrow wallet's chain pubkey — the signer of settlement receipts. */
+  /** The escrow wallet's chain pubkey - the signer of settlement receipts. */
   readonly chainPubkey?: string;
   /** Sign a receipt (secp256k1). Absent → receipts are simply not minted. */
   signMessage?(message: string): string;
@@ -176,6 +177,10 @@ export interface JobView {
   review?: Review;
   /** Signed, independently-verifiable proof of settlement (once settled). */
   receipt?: SignedReceipt;
+  /** The job that sub-hired this one, if any (nested escrow). */
+  parentJobId?: string;
+  /** Jobs this one sub-hired (nested escrow). */
+  children?: string[];
 }
 
 /**
@@ -204,6 +209,10 @@ export class BazaarService {
   private readonly jobParties = new Map<string, { buyer: Identity; provider: Identity }>();
   /** escrowRef -> jobId, for matching an incoming funding memo to its job. */
   private readonly escrowIndex = new Map<string, string>();
+  /** childJobId -> parentJobId: a job spawned by another job (sub-hiring). */
+  private readonly jobParent = new Map<string, string>();
+  /** parentJobId -> childJobIds it sub-hired (nested escrow lineage). */
+  private readonly jobChildren = new Map<string, string[]>();
   private readonly seenFunding = new Set<string>();
   /** jobId -> verified-purchase review (one per job). */
   private readonly reviews = new Map<string, Review>();
@@ -366,7 +375,7 @@ export class BazaarService {
   // ---- hire + funding ----
 
   /** Open an escrow for a listing and return the buyer's payment instructions. */
-  hire(input: { listingId: string; buyer: Identity; input?: unknown }): HireResult {
+  hire(input: { listingId: string; buyer: Identity; input?: unknown; parentJobId?: string }): HireResult {
     const listing = this.listings.get(input.listingId);
     if (!listing || !listing.active) throw new Error('unknown or inactive listing');
     const buyerPrincipal = principalOf(input.buyer);
@@ -387,6 +396,16 @@ export class BazaarService {
     this.jobParties.set(job.jobId, { buyer: input.buyer, provider });
     this.escrowIndex.set(job.escrowRef, job.jobId);
     if (input.input !== undefined) this.inputs.set(job.jobId, input.input);
+    // Nested escrow: an agent hired mid-job can sub-hire another agent. Record
+    // the lineage (display-only; it never affects who gets paid) when the parent
+    // is a real job on this bazaar.
+    if (input.parentJobId && this.jobs.has(input.parentJobId)) {
+      this.jobParent.set(job.jobId, input.parentJobId);
+      const kids = this.jobChildren.get(input.parentJobId) ?? [];
+      kids.push(job.jobId);
+      this.jobChildren.set(input.parentJobId, kids);
+      this.log.info(`job ${job.jobId} sub-hired under parent ${input.parentJobId}`);
+    }
     this.log.info(`hired ${listing.slug}: job ${job.jobId} quoted at ${job.amountUct} UCT`);
     return {
       job,
@@ -634,6 +653,8 @@ export class BazaarService {
       ...(this.settlements.has(jobId) ? { settlement: this.settlements.get(jobId) } : {}),
       ...(this.reviews.has(jobId) ? { review: this.reviews.get(jobId) } : {}),
       ...(this.receipts.has(jobId) ? { receipt: this.receipts.get(jobId) } : {}),
+      ...(this.jobParent.has(jobId) ? { parentJobId: this.jobParent.get(jobId) } : {}),
+      ...(this.jobChildren.has(jobId) ? { children: this.jobChildren.get(jobId) } : {}),
     };
   }
 
@@ -919,6 +940,7 @@ export class BazaarService {
       listingProviders: [...this.listingProviders],
       jobParties: [...this.jobParties],
       escrowIndex: [...this.escrowIndex],
+      jobParent: [...this.jobParent],
       seenFunding: [...this.seenFunding],
       reviews: [...this.reviews],
       reviewsByProvider: [...this.reviewsByProvider],
@@ -951,6 +973,14 @@ export class BazaarService {
     fill(this.favoriteCounts, snap.favoriteCounts);
     fill(this.webhookSecrets, snap.webhookSecrets ?? []);
     fill(this.listingHealth, snap.listingHealth ?? []);
+    fill(this.jobParent, snap.jobParent ?? []);
+    // Rebuild the parent -> children index from the child -> parent map.
+    this.jobChildren.clear();
+    for (const [child, parent] of snap.jobParent ?? []) {
+      const kids = this.jobChildren.get(parent) ?? [];
+      kids.push(child);
+      this.jobChildren.set(parent, kids);
+    }
     this.seenFunding.clear();
     for (const k of snap.seenFunding) this.seenFunding.add(k);
     this.favorites.clear();

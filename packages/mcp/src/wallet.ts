@@ -21,7 +21,7 @@ export interface WalletConfig {
 }
 
 /**
- * The MCP agent's own Sphere wallet — it proves identity (Sign-In-With-Wallet)
+ * The MCP agent's own Sphere wallet - it proves identity (Sign-In-With-Wallet)
  * and funds escrows on testnet2. A trimmed mirror of the backend's SphereAgent:
  * same two-step v2 provider wiring, exposing only what the MCP tools need.
  */

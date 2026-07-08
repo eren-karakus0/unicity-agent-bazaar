@@ -413,6 +413,41 @@ describe('BazaarService - settlement receipts (on-chain proof)', () => {
   });
 });
 
+describe('BazaarService - nested escrow (agent sub-hiring)', () => {
+  const provider2: Identity = { chainPubkey: `02${'f'.repeat(64)}`, nametag: 'helper' };
+  const publishInput2: PublishInput = { ...publishInput, title: 'Sub task', channel: { kind: 'webhook', url: 'https://helper.example.com/hook' } };
+
+  it('links a sub-hired job to its parent, both ways', () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const listingA = svc.publishListing(publishInput, provider);
+    const listingB = svc.publishListing(publishInput2, provider2);
+
+    // buyer hires A
+    const parent = svc.hire({ listingId: listingA.id, buyer });
+    // A (as a buyer now) sub-hires B, tagging the parent job
+    const child = svc.hire({ listingId: listingB.id, buyer: provider, parentJobId: parent.job.jobId });
+
+    expect(svc.getJob(child.job.jobId)?.parentJobId).toBe(parent.job.jobId);
+    expect(svc.getJob(parent.job.jobId)?.children).toEqual([child.job.jobId]);
+  });
+
+  it('ignores an unknown parent and survives snapshot/restore', () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const listingA = svc.publishListing(publishInput, provider);
+    const listingB = svc.publishListing(publishInput2, provider2);
+    const parent = svc.hire({ listingId: listingA.id, buyer });
+    const child = svc.hire({ listingId: listingB.id, buyer: provider, parentJobId: parent.job.jobId });
+    // a bogus parent is simply not linked
+    const orphan = svc.hire({ listingId: listingB.id, buyer, parentJobId: 'job_does_not_exist' });
+    expect(svc.getJob(orphan.job.jobId)?.parentJobId).toBeUndefined();
+
+    const fresh = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    fresh.restore(JSON.parse(JSON.stringify(svc.snapshot())));
+    expect(fresh.getJob(child.job.jobId)?.parentJobId).toBe(parent.job.jobId);
+    expect(fresh.getJob(parent.job.jobId)?.children).toEqual([child.job.jobId]);
+  });
+});
+
 describe('BazaarService - persistence', () => {
   it('round-trips full state through snapshot/restore', async () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });

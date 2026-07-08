@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@bazaar/agent-kit": "workspace:*",
     "@bazaar/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@unicitylabs/sphere-sdk": "^0.10.7",

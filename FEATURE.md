@@ -32,6 +32,11 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   tools (discover / get / hire / pay / status / accept / verify_receipt) backed by
   the agent's own Sphere wallet - so an LLM or another agent can buy a service
   on-chain, end to end. "Agents hiring agents."
+- **Agent-to-agent sub-hiring** (nested escrow): a provider handler gets a
+  `ctx.bazaar` client (`@bazaar/agent-kit` `BazaarClient` — signer + funder
+  injected) and can `hireAndSettle` another listed agent mid-job. The platform
+  records parent↔child job lineage (surfaced in the job view + snapshot). The
+  machine-economy loop, made real.
 - **Signed settlement receipts** (`@bazaar/core` `canonicalReceipt`): every
   settled job yields a receipt signed by the escrow wallet's key and carrying the
   on-chain `txId`. Anyone can verify it offline (`verifySignedMessage`) - the UI

@@ -1,10 +1,10 @@
 /**
- * @bazaar/mcp — the Unicity Agent Bazaar as an MCP server.
+ * @bazaar/mcp - the Unicity Agent Bazaar as an MCP server.
  *
  * Exposes the marketplace to any MCP client (Claude, another agent, an IDE) as
  * tools: discover agents, read their input contract, hire one, fund the escrow
  * from the agent's own wallet, and track delivery. This is "agents hiring
- * agents" — an autonomous agent can now buy a service on-chain, end to end.
+ * agents" - an autonomous agent can now buy a service on-chain, end to end.
  *
  * Talks stdio, so every log MUST go to stderr (stdout is the protocol channel).
  */
@@ -15,8 +15,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { canonicalReceipt } from '@bazaar/core';
 import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { z } from 'zod';
-import { BazaarClient, type ListingLite, type Signer } from './client.js';
+import { BazaarClient, type ListingLite, type Signer } from '@bazaar/agent-kit';
 import { McpWallet } from './wallet.js';
+import { inputContract, summarizeListing } from './format.js';
 
 const PUBLIC_TESTNET2_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
 const DEFAULT_WALLET_API_URL = 'https://wallet-api.unicity.network';
@@ -31,21 +32,6 @@ type Text = { content: { type: 'text'; text: string }[]; isError?: boolean };
 const ok = (text: string): Text => ({ content: [{ type: 'text', text }] });
 const fail = (text: string): Text => ({ content: [{ type: 'text', text }], isError: true });
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
-function summarizeListing(l: ListingLite): string {
-  const rating = l.avgRating != null ? `★${l.avgRating.toFixed(1)}` : 'unrated';
-  const jobs = l.jobsCompleted ? `${l.jobsCompleted} jobs` : 'new';
-  const verified = l.verified ? ' ✓verified' : '';
-  return `- ${l.title} [${l.id}] by ${l.agentNametag} — ${l.priceUct} UCT · ${l.category} · ${rating} · ${jobs}${verified}`;
-}
-
-function inputContract(l: ListingLite): string {
-  if (!l.inputSchema?.length) return 'input: a single free-text value (send as {"text": "..."}).';
-  const lines = l.inputSchema.map(
-    (f) => `  - ${f.name} (${f.type}${f.required ? ', required' : ''})${f.label ? ` — ${f.label}` : ''}`,
-  );
-  return `input fields:\n${lines.join('\n')}`;
-}
 
 function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): McpServer {
   const server = new McpServer({ name: 'unicity-agent-bazaar', version: '0.1.0' });
@@ -113,7 +99,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
     {
       title: 'Hire an agent',
       description:
-        'Open an on-chain escrow to hire an agent for one job. Provide the input object matching the listing schema (use get_agent to see it). Returns a jobId and payment details — the escrow is NOT funded yet; call pay_escrow next.',
+        'Open an on-chain escrow to hire an agent for one job. Provide the input object matching the listing schema (use get_agent to see it). Returns a jobId and payment details - the escrow is NOT funded yet; call pay_escrow next.',
       inputSchema: { listingId: z.string(), input: z.record(z.any()).optional() },
     },
     async ({ listingId, input }) => {
@@ -123,7 +109,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
         return ok(
           [
             `Escrow opened. jobId=${h.job.jobId}`,
-            `Price: ${h.amountUct} UCT — held in escrow, released only on delivery.`,
+            `Price: ${h.amountUct} UCT - held in escrow, released only on delivery.`,
             `Next: call pay_escrow with jobId="${h.job.jobId}" to fund it from your wallet.`,
           ].join('\n'),
         );
@@ -147,7 +133,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
       try {
         const view = await client.job(jobId);
         if (view.job.state !== 'quoted') {
-          return ok(`Job ${jobId} is already "${view.job.state}" — no payment needed.`);
+          return ok(`Job ${jobId} is already "${view.job.state}" - no payment needed.`);
         }
         const dep = await client.depositInfo();
         await wallet.send(dep.escrow, view.job.amountUct, view.job.escrowRef);
@@ -188,7 +174,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
         if (v.settlement) lines.push(`\nsettlement: ${v.settlement.status} (${v.settlement.kind})`);
         if (v.receipt) {
           lines.push(
-            `\nsigned settlement receipt available (signer ${v.receipt.signer.slice(0, 12)}…) — call verify_receipt to check it independently.`,
+            `\nsigned settlement receipt available (signer ${v.receipt.signer.slice(0, 12)}…) - call verify_receipt to check it independently.`,
           );
         }
         return ok(lines.join('\n'));
@@ -208,8 +194,8 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
     async ({ jobId }) => {
       if (!getWallet()) return fail('Read-only mode: set BAZAAR_MCP_MNEMONIC to act on jobs.');
       try {
-        const { job } = await client.accept(jobId);
-        return ok(`Released. Job ${jobId} is now "${job.state}" — the provider has been paid.`);
+        const job = await client.accept(jobId);
+        return ok(`Released. Job ${jobId} is now "${job.state}" - the provider has been paid.`);
       } catch (e) {
         return fail(`Accept failed: ${errMsg(e)}`);
       }
@@ -221,7 +207,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
     {
       title: 'Verify a settlement receipt',
       description:
-        "Independently verify a job's settlement receipt: checks the escrow wallet's signature over the canonical receipt with secp256k1 — locally, without trusting the API. Proves the job settled exactly as stated.",
+        "Independently verify a job's settlement receipt: checks the escrow wallet's signature over the canonical receipt with secp256k1 - locally, without trusting the API. Proves the job settled exactly as stated.",
       inputSchema: { jobId: z.string() },
     },
     async ({ jobId }) => {
@@ -232,7 +218,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
         const valid = verifySignedMessage(canonicalReceipt(receipt), signature, signer);
         return ok(
           [
-            valid ? '✓ VALID — signature verifies against the escrow key.' : '✗ INVALID — signature does not match.',
+            valid ? '✓ VALID - signature verifies against the escrow key.' : '✗ INVALID - signature does not match.',
             `outcome: ${receipt.outcome} of ${receipt.amountUct} UCT`,
             `recipient: ${receipt.recipient}`,
             `signer (escrow): ${signer}`,
@@ -254,7 +240,7 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
     },
     async () => {
       const wallet = getWallet();
-      if (!wallet) return ok('Read-only mode — no wallet. Set BAZAAR_MCP_MNEMONIC to hire and pay.');
+      if (!wallet) return ok('Read-only mode - no wallet. Set BAZAAR_MCP_MNEMONIC to hire and pay.');
       try {
         const balance = await wallet.balanceUct();
         return ok(
@@ -293,15 +279,20 @@ async function main(): Promise<void> {
       signer = { chainPubkey: wallet.chainPubkey, nametag: wallet.nametag, sign: (m) => wallet!.signMessage(m) };
       log(`wallet ready: ${signer.nametag ? '@' + signer.nametag : signer.chainPubkey.slice(0, 12) + '…'}`);
     } catch (e) {
-      log('wallet init failed — running read-only:', errMsg(e));
+      log('wallet init failed - running read-only:', errMsg(e));
       wallet = null;
       signer = undefined;
     }
   } else {
-    log('no BAZAAR_MCP_MNEMONIC — running read-only (discover/get/status only)');
+    log('no BAZAAR_MCP_MNEMONIC - running read-only (discover/get/status only)');
   }
 
-  const client = new BazaarClient(apiUrl, signer);
+  const funder = wallet
+    ? async (to: string, amountUct: number, memo: string) => {
+        await wallet!.send(to, amountUct, memo);
+      }
+    : undefined;
+  const client = new BazaarClient(apiUrl, { signer, funder });
   if (signer) {
     try {
       await client.login();
@@ -313,7 +304,7 @@ async function main(): Promise<void> {
 
   const server = buildServer(client, () => wallet);
   await server.connect(new StdioServerTransport());
-  log(`connected to ${apiUrl} — ready`);
+  log(`connected to ${apiUrl} - ready`);
 }
 
 main().catch((e) => {

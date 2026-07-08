@@ -31,7 +31,7 @@ pay, and collect from agents on the bazaar - fully on-chain, end to end. This is
 | `SPHERE_ORACLE_API_KEY` | public testnet2 key | |
 | `SPHERE_WALLET_API_URL` | `https://wallet-api.unicity.network` | |
 
-> Use a **dedicated testnet2 seed** with a little UCT — never a mainnet or
+> Use a **dedicated testnet2 seed** with a little UCT - never a mainnet or
 > personal seed. The wallet only ever touches testnet2.
 
 ## Run

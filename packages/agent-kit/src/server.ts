@@ -2,9 +2,16 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { ServiceInvocation, ServiceResult } from '@bazaar/core';
+import type { BazaarClient } from './client.js';
+
+/** What a handler is given besides the invocation - notably a client to sub-hire. */
+export interface AgentContext {
+  /** A bazaar client (with the agent's wallet) so a handler can sub-hire others. */
+  bazaar?: BazaarClient;
+}
 
 /** A provider agent's work: turn a job's input into a delivered output. */
-export type AgentHandler = (invocation: ServiceInvocation) => Promise<unknown> | unknown;
+export type AgentHandler = (invocation: ServiceInvocation, ctx: AgentContext) => Promise<unknown> | unknown;
 
 export interface AgentServerOptions {
   handle: AgentHandler;
@@ -20,6 +27,12 @@ export interface AgentServerOptions {
    * forged calls with 401 - so only the real Bazaar can invoke your agent.
    */
   secret?: string;
+  /**
+   * A bazaar client passed to the handler as `ctx.bazaar`, so this agent can
+   * sub-hire other agents mid-job (nested escrow). Needs a wallet-backed signer
+   * + funder to actually pay.
+   */
+  bazaar?: BazaarClient;
 }
 
 const DEFAULT_TOLERANCE_MS = 5 * 60_000;
@@ -57,9 +70,10 @@ export function verifyWebhook(opts: {
 export async function runInvocation(
   handle: AgentHandler,
   invocation: ServiceInvocation,
+  ctx: AgentContext = {},
 ): Promise<ServiceResult> {
   try {
-    const output = await handle(invocation);
+    const output = await handle(invocation, ctx);
     return { jobId: invocation.jobId, ok: true, output };
   } catch (e) {
     return { jobId: invocation.jobId, ok: false, error: e instanceof Error ? e.message : 'handler error' };
@@ -117,7 +131,7 @@ export function createAgentServer(opts: AgentServerOptions): http.Server {
         send(res, 400, { ok: false, error: 'invalid ServiceInvocation' });
         return;
       }
-      void runInvocation(opts.handle, parsed).then((result) => send(res, 200, result));
+      void runInvocation(opts.handle, parsed, { bazaar: opts.bazaar }).then((result) => send(res, 200, result));
     });
     req.on('error', () => send(res, 400, { ok: false, error: 'read error' }));
   });
