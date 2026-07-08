@@ -17,7 +17,7 @@ const UCT = 'UCT';
 const DEFAULT_UCT_DECIMALS = 18;
 
 export interface SphereAgentOptions {
-  /** Logical name, e.g. 'escrow' — used for logs, deviceId, data dir. */
+  /** Logical name, e.g. 'escrow' - used for logs, deviceId, data dir. */
   name: string;
   /** Desired on-network @nametag (without the @). */
   nametag: string;
@@ -35,10 +35,10 @@ export interface SphereAgentOptions {
 }
 
 /**
- * SphereAgent — a thin, reusable wrapper around a single Sphere v2 wallet.
+ * SphereAgent - a thin, reusable wrapper around a single Sphere v2 wallet.
  *
  * It performs the two-step v2 provider wiring (base providers + wallet-api
- * rails — the step that silently breaks transfers if skipped) and exposes the
+ * rails - the step that silently breaks transfers if skipped) and exposes the
  * economic primitives the platform needs: mint, send, history, balance.
  */
 export class SphereAgent {
@@ -59,7 +59,7 @@ export class SphereAgent {
   }
 
   get sphere(): Sphere {
-    if (!this.inner) throw new Error(`[${this.name}] agent not started — call start() first`);
+    if (!this.inner) throw new Error(`[${this.name}] agent not started - call start() first`);
     return this.inner;
   }
 
@@ -101,18 +101,18 @@ export class SphereAgent {
       this.uctDecimals = undefined;
     }
 
-    this.log.info(`ready — @${this.nametag}  addr=${this.directAddress?.slice(0, 24)}…`);
+    this.log.info(`ready - @${this.nametag}  addr=${this.directAddress?.slice(0, 24)}…`);
     if (created && generatedMnemonic) {
-      // Never print a live mnemonic to stdout/stderr — hosting logs are retained
+      // Never print a live mnemonic to stdout/stderr - hosting logs are retained
       // and often exportable. Persist it beside the wallet's own key storage (the
       // dataDir already holds secrets and is gitignored) and log only the path.
       const secretPath = path.join(this.opts.dataDir, 'mnemonic.txt');
       const envKey = this.opts.mnemonicEnvHint ?? `${this.name.toUpperCase()}_MNEMONIC`;
       try {
         writeFileSync(secretPath, `${generatedMnemonic}\n`, { encoding: 'utf8', mode: 0o600 });
-        this.log.warn(`NEW wallet generated — mnemonic written to ${secretPath}. Copy it into .env as ${envKey}, then delete the file.`);
+        this.log.warn(`NEW wallet generated - mnemonic written to ${secretPath}. Copy it into .env as ${envKey}, then delete the file.`);
       } catch {
-        this.log.warn(`NEW wallet generated — set ${envKey} in .env (mnemonic withheld from logs).`);
+        this.log.warn(`NEW wallet generated - set ${envKey} in .env (mnemonic withheld from logs).`);
       }
     }
     return { created, mnemonic: generatedMnemonic };
@@ -128,7 +128,7 @@ export class SphereAgent {
     return this.inner?.identity?.chainPubkey;
   }
 
-  /** UCT coin id (hex) + decimals — e.g. for building wallet send-intents. */
+  /** UCT coin id (hex) + decimals - e.g. for building wallet send-intents. */
   get uctCoin(): { coinId: string; decimals: number } {
     return { coinId: this.uctCoinId, decimals: this.uctDecimals ?? DEFAULT_UCT_DECIMALS };
   }

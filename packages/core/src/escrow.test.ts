@@ -11,7 +11,7 @@ import {
 const base = () =>
   openEscrow({ listingId: 'l1', buyerNametag: '@buyer', providerNametag: '@seller', amountUct: 10, now: 1000 });
 
-describe('escrow — opening', () => {
+describe('escrow - opening', () => {
   it('opens in the quoted state with a job id and escrow ref', () => {
     const job = base();
     expect(job.state).toBe('quoted');
@@ -27,7 +27,7 @@ describe('escrow — opening', () => {
   });
 });
 
-describe('escrow — state machine', () => {
+describe('escrow - state machine', () => {
   it('walks the happy path quoted → funded → delivered → released', () => {
     let job = base();
     job = applyEscrowEvent(job, 'fund', 2000);
@@ -71,7 +71,7 @@ describe('escrow — state machine', () => {
   });
 });
 
-describe('escrow — auto-release window', () => {
+describe('escrow - auto-release window', () => {
   const delivered: EscrowJob = applyEscrowEvent(applyEscrowEvent(base(), 'fund', 2000), 'deliver', 3000);
 
   it('is not releasable before the window elapses', () => {

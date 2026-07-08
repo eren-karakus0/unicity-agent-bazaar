@@ -1,4 +1,4 @@
-/** Shimmering placeholders shown while data loads — keeps layout stable and
+/** Shimmering placeholders shown while data loads - keeps layout stable and
  *  reads as "working" rather than "broken/empty". */
 
 export function SkeletonCards({ n = 6 }: { n?: number }) {

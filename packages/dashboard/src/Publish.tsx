@@ -106,7 +106,7 @@ export function Publish() {
           Publish an <span>agent</span>
         </h1>
         <p className="hero__sub">
-          Expose any agent as a paid service. Give it a price and a webhook the bazaar can call — it becomes
+          Expose any agent as a paid service. Give it a price and a webhook the bazaar can call - it becomes
           hireable, with escrow handling the money.
         </p>
       </section>
@@ -117,7 +117,7 @@ export function Publish() {
         <div className="panel gate">
           <h3 className="gate__h">Sign in to publish</h3>
           <p className="gate__p">
-            Listings are owned by the wallet that publishes them — connect yours and sign a one-time message to
+            Listings are owned by the wallet that publishes them - connect yours and sign a one-time message to
             prove it. No funds move; it just links the listing to your on-chain identity.
           </p>
           <button className="btn btn--primary" disabled={phase === 'signing-in'} onClick={() => void signIn()}>
@@ -133,13 +133,13 @@ export function Publish() {
               <span className="acct__dot" />
               {displayName(session)}
               {!session?.nametag && (
-                <span className="whoami__hint">— register a @nametag in your wallet for a friendlier handle</span>
+                <span className="whoami__hint">- register a @nametag in your wallet for a friendlier handle</span>
               )}
             </div>
           </div>
           <div className="field">
             <label>service title</label>
-            <input value={f.title} onChange={set('title')} placeholder="Text scout — quick content analysis" required />
+            <input value={f.title} onChange={set('title')} placeholder="Text scout - quick content analysis" required />
           </div>
           <div className="field">
             <label>description</label>
@@ -197,10 +197,10 @@ function SchemaBuilder({ fields, onChange }: { fields: BuilderField[]; onChange:
 
   return (
     <div className="field">
-      <label>input fields <span className="whoami__hint">— optional; buyers get a typed form instead of a text box</span></label>
+      <label>input fields <span className="whoami__hint">- optional; buyers get a typed form instead of a text box</span></label>
       {fields.length === 0 && (
         <div className="hint" style={{ marginBottom: 8 }}>
-          No fields yet — buyers will send a single free-text input. Add fields to define exactly what your agent
+          No fields yet - buyers will send a single free-text input. Add fields to define exactly what your agent
           expects.
         </div>
       )}
@@ -258,7 +258,7 @@ function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () =>
       await navigator.clipboard.writeText(text);
       toast(`${label} copied`, 'ok');
     } catch {
-      toast('copy failed — select and copy manually', 'bad');
+      toast('copy failed - select and copy manually', 'bad');
     }
   };
 
@@ -280,7 +280,7 @@ function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () =>
     try {
       input = JSON.parse(testInput);
     } catch {
-      // not JSON — send the raw string as the input
+      // not JSON - send the raw string as the input
     }
     try {
       setResult(await api.testInvoke(data.listing.id, input));
@@ -316,7 +316,7 @@ function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () =>
       {data.webhookSecret && (
         <div className="secretbox">
           <div className="secretbox__label">
-            signing secret <span className="secretbox__once">shown once — save it now</span>
+            signing secret <span className="secretbox__once">shown once - save it now</span>
           </div>
           <p className="secretbox__hint">
             The bazaar signs every job POST with this secret (header <code>x-bazaar-signature</code>). Verify it in
@@ -357,7 +357,22 @@ function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () =>
         </div>
         {result && (
           <div className={`testresult ${result.ok ? 'testresult--ok' : 'testresult--bad'}`}>
-            <div className="testresult__head">{result.ok ? '✓ agent responded' : '✕ call failed'}</div>
+            <div className="testresult__head">
+              <span>{result.ok ? '✓ agent responded' : '✕ call failed'}</span>
+              <button
+                className="copy"
+                onClick={() =>
+                  void copy(
+                    result.ok
+                      ? JSON.stringify(result.output ?? null, null, 2)
+                      : (result.error ?? 'no error detail'),
+                    'Output',
+                  )
+                }
+              >
+                copy output
+              </button>
+            </div>
             <pre className="testresult__body">
               {result.ok
                 ? JSON.stringify(result.output ?? null, null, 2)
@@ -372,6 +387,6 @@ function PublishSuccess({ data, onDismiss }: { data: Published; onDismiss: () =>
 
 function HealthPill({ health }: { health?: ListingHealth }) {
   if (!health) return <span className="hpill hpill--unknown">reachability unknown</span>;
-  if (health.ok) return <span className="hpill hpill--ok">✓ verified — endpoint reachable</span>;
-  return <span className="hpill hpill--bad">unreachable{health.detail ? ` — ${health.detail}` : ''}</span>;
+  if (health.ok) return <span className="hpill hpill--ok">✓ verified - endpoint reachable</span>;
+  return <span className="hpill hpill--bad">unreachable{health.detail ? ` - ${health.detail}` : ''}</span>;
 }

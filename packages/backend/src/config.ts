@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export type NetworkType = 'mainnet' | 'testnet' | 'testnet2' | 'dev';
 
-/** Public testnet2 gateway key (NOT a secret — documented in the SDK README). */
+/** Public testnet2 gateway key (NOT a secret - documented in the SDK README). */
 export const PUBLIC_TESTNET2_KEY = 'sk_ddc3cfcc001e4a28ac3fad7407f99590';
 export const DEFAULT_WALLET_API_URL = 'https://wallet-api.unicity.network';
 
@@ -56,7 +56,7 @@ export function loadEnv(): BazaarEnv {
 
   // Session secret: prefer a configured one (so tokens survive restarts /
   // multiple instances). If none is set, fall back to a random per-boot secret
-  // — logins still work, but every restart invalidates existing sessions.
+  // - logins still work, but every restart invalidates existing sessions.
   const configuredSecret = clean(process.env.BAZAAR_SESSION_SECRET);
   const sessionSecret = configuredSecret ?? crypto.randomBytes(32).toString('hex');
   const sessionTtlMin = Number(clean(process.env.BAZAAR_SESSION_TTL_MINUTES) ?? String(24 * 60));

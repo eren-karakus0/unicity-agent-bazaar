@@ -59,13 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const bal = await wallet.getUctBalance(info.coinId, info.decimals);
         if (bal !== null) setBalance(bal);
       } catch {
-        /* wallet locked / no permission / offline — keep the last known value */
+        /* wallet locked / no permission / offline - keep the last known value */
       }
     })();
   }, [wallet]);
 
   // Restore a stored session on load. We decode the token locally so the user
-  // stays signed in INSTANTLY across refreshes — even while the backend is
+  // stays signed in INSTANTLY across refreshes - even while the backend is
   // waking up. A background check only signs out on a definitive 401 (a truly
   // invalid/expired token), never on a transient network error.
   useEffect(() => {
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(null);
           setPhase('anonymous');
         }
-        // else: backend asleep/unreachable — keep the optimistic session.
+        // else: backend asleep/unreachable - keep the optimistic session.
       });
   }, []);
 

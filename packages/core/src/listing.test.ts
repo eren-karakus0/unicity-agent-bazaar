@@ -35,7 +35,7 @@ describe('validateListing', () => {
   });
 });
 
-describe('validateListing — input schema', () => {
+describe('validateListing - input schema', () => {
   it('accepts a valid declared schema', () => {
     const r = validateListing({
       ...good,

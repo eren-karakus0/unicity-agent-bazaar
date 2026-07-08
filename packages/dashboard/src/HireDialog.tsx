@@ -73,7 +73,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
         coinId: hire.coinId,
         memo: hire.memo,
       });
-      refreshBalance(); // funds left the wallet — reflect the new balance
+      refreshBalance(); // funds left the wallet - reflect the new balance
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'wallet payment was cancelled');
     } finally {
@@ -181,7 +181,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                     </button>
                   </div>
                   <div className="hint" style={{ marginTop: 8 }}>
-                    One click opens your wallet to approve the transfer — the memo is attached automatically. Or
+                    One click opens your wallet to approve the transfer - the memo is attached automatically. Or
                     send {hire.amountUct} UCT to {hire.payTo} manually with the memo above.
                   </div>
                 </>
@@ -216,7 +216,10 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
 
               {jobv?.result?.ok && (
                 <div className="result">
-                  <div className="result__h">delivered output</div>
+                  <div className="result__h">
+                    <span>delivered output</span>
+                    <CopyBtn v={pretty(jobv.result.output)} label="copy output" />
+                  </div>
                   <pre>{pretty(jobv.result.output)}</pre>
                 </div>
               )}
@@ -320,15 +323,15 @@ function statusText(s: EscrowState): string {
     case 'quoted':
       return 'waiting for your payment into escrow…';
     case 'funded':
-      return 'funded — the agent is working…';
+      return 'funded - the agent is working…';
     case 'delivered':
-      return 'delivered — review, then release the funds.';
+      return 'delivered - review, then release the funds.';
     case 'released':
-      return 'released — the agent has been paid. Done!';
+      return 'released - the agent has been paid. Done!';
     case 'refunded':
-      return 'refunded — the funds were returned to you.';
+      return 'refunded - the funds were returned to you.';
     case 'disputed':
-      return 'disputed — pending resolution.';
+      return 'disputed - pending resolution.';
     case 'cancelled':
       return 'cancelled.';
     default:
@@ -342,7 +345,7 @@ function pretty(x: unknown): string {
     return String(x);
   }
 }
-function CopyBtn({ v }: { v: string }) {
+function CopyBtn({ v, label = 'copy' }: { v: string; label?: string }) {
   const toast = useToast();
   return (
     <button
@@ -352,7 +355,7 @@ function CopyBtn({ v }: { v: string }) {
         toast('Copied to clipboard', 'info');
       }}
     >
-      copy
+      {label}
     </button>
   );
 }

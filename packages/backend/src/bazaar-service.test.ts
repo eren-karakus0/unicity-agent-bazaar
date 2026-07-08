@@ -48,7 +48,7 @@ function fund(svc: BazaarService, hire: { memo: string; amountUct: number }, ded
   return svc.creditFunding({ dedupKey, amountBase: String(hire.amountUct * 100), memo: hire.memo });
 }
 
-describe('BazaarService — registry', () => {
+describe('BazaarService - registry', () => {
   it('publishes and lists active listings', () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
     const l = svc.publishListing(publishInput, provider);
@@ -63,7 +63,7 @@ describe('BazaarService — registry', () => {
   });
 });
 
-describe('BazaarService — happy path (fund → deliver → release)', () => {
+describe('BazaarService - happy path (fund → deliver → release)', () => {
   it('funds, invokes, delivers, and releases to the provider on accept', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
@@ -95,7 +95,7 @@ describe('BazaarService — happy path (fund → deliver → release)', () => {
   });
 });
 
-describe('BazaarService — provider failure refunds the buyer', () => {
+describe('BazaarService - provider failure refunds the buyer', () => {
   it('refunds when the provider fails', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('fail') });
@@ -113,7 +113,7 @@ describe('BazaarService — provider failure refunds the buyer', () => {
   });
 });
 
-describe('BazaarService — funding rules', () => {
+describe('BazaarService - funding rules', () => {
   it('ignores a wrong memo, an underfunded amount, and a duplicate dedupKey', async () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
     const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
@@ -129,7 +129,7 @@ describe('BazaarService — funding rules', () => {
   });
 });
 
-describe('BazaarService — auto-release', () => {
+describe('BazaarService - auto-release', () => {
   it('auto-releases a delivered job after its window', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok'), autoReleaseMs: 1000 });
@@ -147,7 +147,7 @@ describe('BazaarService — auto-release', () => {
   });
 });
 
-describe('BazaarService — dispute', () => {
+describe('BazaarService - dispute', () => {
   it('disputes a delivered job and resolves it as a refund', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
@@ -191,7 +191,7 @@ describe('BazaarService — dispute', () => {
   });
 });
 
-describe('BazaarService — profiles', () => {
+describe('BazaarService - profiles', () => {
   it('aggregates a principal’s listings, activity, and stats', async () => {
     const sent: Sent[] = [];
     const svc = new BazaarService({ agent: stubAgent(sent), invoke: invoker('ok') });
@@ -219,7 +219,7 @@ describe('BazaarService — profiles', () => {
   });
 });
 
-describe('BazaarService — reviews, favorites, trending', () => {
+describe('BazaarService - reviews, favorites, trending', () => {
   async function releasedJob(svc: BazaarService) {
     const listing = svc.publishListing(publishInput, provider);
     const hire = svc.hire({ listingId: listing.id, buyer });
@@ -276,7 +276,7 @@ describe('BazaarService — reviews, favorites, trending', () => {
   });
 });
 
-describe('BazaarService — publish hardening (health + test invoke)', () => {
+describe('BazaarService - publish hardening (health + test invoke)', () => {
   it('marks a reachable listing verified and probes its /health sibling', async () => {
     const probed: string[] = [];
     const svc = new BazaarService({
@@ -352,7 +352,7 @@ describe('BazaarService — publish hardening (health + test invoke)', () => {
   });
 });
 
-describe('BazaarService — persistence', () => {
+describe('BazaarService - persistence', () => {
   it('round-trips full state through snapshot/restore', async () => {
     const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
     const listing = svc.publishListing(publishInput, provider);

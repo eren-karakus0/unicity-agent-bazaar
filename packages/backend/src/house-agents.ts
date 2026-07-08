@@ -1,5 +1,5 @@
 /**
- * House agents — a couple of first-party reference agents the platform runs
+ * House agents - a couple of first-party reference agents the platform runs
  * itself, so the marketplace is never empty and the whole signed-webhook path
  * (publish → sign → verify → deliver → settle) is dogfooded on every boot.
  *
@@ -19,7 +19,7 @@ import { createLogger, type Logger } from './logger.js';
 const HOUSE_NAMETAG = 'bazaar-labs';
 
 interface HouseAgent {
-  /** Loopback port offset from the base — keeps URLs (and thus listing ids) stable. */
+  /** Loopback port offset from the base - keeps URLs (and thus listing ids) stable. */
   portOffset: number;
   /** Fixed timestamp → deterministic listing id across restarts. */
   seedAt: number;
@@ -77,7 +77,7 @@ const AGENTS: HouseAgent[] = [
   {
     portOffset: 1,
     seedAt: 1_700_000_000_001,
-    title: 'Text Insights — instant content analysis',
+    title: 'Text Insights - instant content analysis',
     description:
       'Send any text and get word & sentence counts, an estimated reading time, the longest word, and the top keywords. A first-party agent, always live.',
     category: 'analysis',
@@ -90,9 +90,9 @@ const AGENTS: HouseAgent[] = [
   {
     portOffset: 2,
     seedAt: 1_700_000_000_002,
-    title: 'Dice Oracle — hire an agent in one click',
+    title: 'Dice Oracle - hire an agent in one click',
     description:
-      'Roll any number of dice with any number of sides. The simplest possible agent — hire it end-to-end to see escrow, delivery, and release in action.',
+      'Roll any number of dice with any number of sides. The simplest possible agent - hire it end-to-end to see escrow, delivery, and release in action.',
     category: 'game',
     priceUct: 1,
     inputSchema: [
@@ -109,7 +109,7 @@ export interface HouseAgentsHandle {
 }
 
 /**
- * Start the house agents and seed their listings. Never throws — a failure to
+ * Start the house agents and seed their listings. Never throws - a failure to
  * bind a loopback port just means that demo agent is skipped this boot.
  */
 export async function startHouseAgents(opts: {
@@ -122,10 +122,10 @@ export async function startHouseAgents(opts: {
   const servers: http.Server[] = [];
 
   if (!opts.escrowChainPubkey) {
-    log.warn('escrow chain pubkey unavailable — skipping house agents (no fund-safe settlement key)');
+    log.warn('escrow chain pubkey unavailable - skipping house agents (no fund-safe settlement key)');
     return { servers, stop: async () => {} };
   }
-  // Released funds route to this key — the escrow wallet itself, so they return home.
+  // Released funds route to this key - the escrow wallet itself, so they return home.
   const owner: Identity = { chainPubkey: opts.escrowChainPubkey, nametag: HOUSE_NAMETAG };
 
   for (const def of AGENTS) {

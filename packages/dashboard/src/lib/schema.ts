@@ -3,7 +3,7 @@ import type { InputField } from './api';
 /** A form's working value per field (strings from inputs, booleans from checkboxes). */
 export type FieldValues = Record<string, string | boolean>;
 
-/** Initial form values for a schema — empty strings, unchecked booleans. */
+/** Initial form values for a schema - empty strings, unchecked booleans. */
 export function initialValues(schema: InputField[]): FieldValues {
   const v: FieldValues = {};
   for (const f of schema) v[f.name] = f.type === 'boolean' ? false : '';
@@ -42,7 +42,7 @@ export function firstMissingRequired(schema: InputField[], values: FieldValues):
   return null;
 }
 
-/** A sample JSON input matching the schema — seeds the test-invocation console. */
+/** A sample JSON input matching the schema - seeds the test-invocation console. */
 export function sampleJson(schema: InputField[]): string {
   const obj: Record<string, unknown> = {};
   for (const f of schema) {

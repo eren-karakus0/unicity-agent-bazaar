@@ -12,12 +12,12 @@ const WALLET_URL = 'https://sphere.unicity.network';
 const SESSION_KEY = 'sphere-connect-session';
 // The public identity is persisted so the user stays connected across refreshes
 // without re-opening the wallet popup. All state-changing actions (sign-in,
-// deposits) still go through the wallet's own approval UI — the dapp holds no keys.
+// deposits) still go through the wallet's own approval UI - the dapp holds no keys.
 const IDENTITY_KEY = 'sphere-connect-identity';
 
 const DAPP = {
   name: 'Unicity Agent Bazaar',
-  description: 'Hire autonomous agents and pay on delivery — on-chain escrow, settled in real UCT.',
+  description: 'Hire autonomous agents and pay on delivery - on-chain escrow, settled in real UCT.',
   url: typeof location !== 'undefined' ? location.origin : 'https://unicityagentbazaar.vercel.app',
   icon: '/icon.svg',
 };
@@ -33,7 +33,7 @@ function hasExtension(): boolean {
 }
 
 /**
- * Wait for the wallet popup to post HOST_READY before we handshake — otherwise
+ * Wait for the wallet popup to post HOST_READY before we handshake - otherwise
  * the connect message races ahead of the wallet's listener and is dropped
  * (the popup opens but never shows the approval UI).
  */
@@ -41,7 +41,7 @@ function waitForHostReady(timeoutMs = HOST_READY_TIMEOUT): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       window.removeEventListener('message', handler);
-      reject(new Error('Wallet did not become ready — make sure you are signed in to your Sphere wallet.'));
+      reject(new Error('Wallet did not become ready - make sure you are signed in to your Sphere wallet.'));
     }, timeoutMs);
     function handler(event: MessageEvent) {
       if ((event.data as { type?: string })?.type === HOST_READY_TYPE) {
@@ -94,7 +94,7 @@ export interface WalletState {
   signMessage: (message: string) => Promise<string>;
   /**
    * Read the wallet's confirmed UCT balance (human string) via the live session
-   * — does NOT open the wallet. Returns null when there is no live session yet.
+   * - does NOT open the wallet. Returns null when there is no live session yet.
    */
   getUctBalance: (coinId: string, decimals: number) => Promise<string | null>;
   /**
@@ -121,12 +121,12 @@ export function useWallet(): WalletState {
         setStatus('connected');
       }
     } catch {
-      /* corrupt / unavailable storage — ignore */
+      /* corrupt / unavailable storage - ignore */
     }
   }, []);
 
   /**
-   * Get a LIVE ConnectClient session — reuses the current one when its transport
+   * Get a LIVE ConnectClient session - reuses the current one when its transport
    * is still alive, otherwise opens the wallet (popup/extension) and handshakes
    * (resuming the previous session skips the approval screen).
    */
@@ -146,7 +146,7 @@ export function useWallet(): WalletState {
         'sphere-connect',
         'width=440,height=680',
       );
-      if (!popup) throw new Error('Popup blocked — please allow popups for this site.');
+      if (!popup) throw new Error('Popup blocked - please allow popups for this site.');
       popupRef.current = popup;
       transport = PostMessageTransport.forClient({ target: popup, targetOrigin: WALLET_URL });
       isPopup = true;
@@ -169,7 +169,7 @@ export function useWallet(): WalletState {
     try {
       localStorage.setItem(IDENTITY_KEY, JSON.stringify(result.identity));
     } catch {
-      /* storage unavailable — non-fatal, connection still works this session */
+      /* storage unavailable - non-fatal, connection still works this session */
     }
     setIdentity(result.identity);
     setStatus('connected');
@@ -203,8 +203,8 @@ export function useWallet(): WalletState {
   const getUctBalance = useCallback(
     async (coinId: string, decimals: number): Promise<string | null> => {
       const client = clientRef.current;
-      if (!client?.isConnected) return null; // no live session — never force a popup for a read
-      // Bridges to sphere.payments.getAssets(coinId) — the same Asset shape the
+      if (!client?.isConnected) return null; // no live session - never force a popup for a read
+      // Bridges to sphere.payments.getAssets(coinId) - the same Asset shape the
       // backend sums (symbol / coinId / confirmedAmount / totalAmount, base units).
       const assets = (await client.query('sphere_getAssets', { coinId })) as {
         symbol?: string;

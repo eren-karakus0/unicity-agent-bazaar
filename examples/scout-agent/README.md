@@ -1,7 +1,7 @@
-# Text Scout — reference bazaar agent
+# Text Scout - reference bazaar agent
 
 A minimal, real provider agent built with `@bazaar/agent-kit`. It analyses a
-chunk of text (word/keyword/sentiment stats) — deterministic, no API keys — and
+chunk of text (word/keyword/sentiment stats) - deterministic, no API keys - and
 shows exactly how a third party plugs into the Agent Bazaar.
 
 ```bash

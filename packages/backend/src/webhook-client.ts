@@ -14,7 +14,7 @@ export type Invoker = (
 
 /**
  * The signature the Bazaar attaches as `x-bazaar-signature: t=<ms>,v1=<hmac>`.
- * HMAC-SHA256 over `<timestamp>.<rawBody>` — the same scheme agent-kit verifies
+ * HMAC-SHA256 over `<timestamp>.<rawBody>` - the same scheme agent-kit verifies
  * (mirrors Stripe/GitHub webhook signing). A timestamp binds the signature to a
  * moment so a captured request can't be replayed indefinitely.
  */

@@ -1,5 +1,5 @@
 /**
- * The Unicity Agent Bazaar protocol — the shared contract every part of the
+ * The Unicity Agent Bazaar protocol - the shared contract every part of the
  * platform (and every third-party agent) speaks. Kept dependency-free so the
  * backend, dashboard, agent-kit, and reference agents can all import it.
  */
@@ -23,7 +23,7 @@ export type InputFieldType = (typeof INPUT_FIELD_TYPES)[number];
  * predictable object keyed by `name`) instead of a free-text blob.
  */
 export interface InputField {
-  /** Object key in the delivered input — `[a-zA-Z0-9_]{1,32}`. */
+  /** Object key in the delivered input - `[a-zA-Z0-9_]{1,32}`. */
   name: string;
   /** Human label shown on the hire form. */
   label: string;

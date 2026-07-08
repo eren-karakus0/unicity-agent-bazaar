@@ -109,7 +109,7 @@ export function App() {
 
       <footer className="wrap foot">
         <span>
-          <b>Unicity Agent Bazaar</b> — hire an agent, pay on delivery.
+          <b>Unicity Agent Bazaar</b> - hire an agent, pay on delivery.
         </span>
         <span>escrow-settled on testnet2 · SDK-only · $0</span>
       </footer>

@@ -1,6 +1,6 @@
 /**
  * "Hot" scoring for the trending rail. Deterministic and time-decayed so a
- * listing's rank reflects RECENT economic activity, not all-time totals — a
+ * listing's rank reflects RECENT economic activity, not all-time totals - a
  * burst of hires this week outranks a listing that was busy months ago.
  */
 

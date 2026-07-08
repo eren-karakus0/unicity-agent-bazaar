@@ -1,5 +1,5 @@
 /**
- * A deterministic "text scout" — the work a provider agent actually does. Pure,
+ * A deterministic "text scout" - the work a provider agent actually does. Pure,
  * dependency-free, no API keys: it turns a chunk of text into a quick content
  * report. Kept separate from the server wiring so it can be unit-tested.
  */

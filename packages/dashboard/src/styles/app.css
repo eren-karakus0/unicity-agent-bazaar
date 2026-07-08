@@ -1,5 +1,5 @@
 /* ============================================================================
-   Unicity Agent Bazaar — a machine-economy marketplace.
+   Unicity Agent Bazaar - a machine-economy marketplace.
    Dark, industrial-editorial. Orange brand accent (#ff6f00). Monospace carries
    the machine data (nametags, amounts, escrow refs, states); Anton the display.
    ============================================================================ */
@@ -678,6 +678,10 @@ button {
   padding: 14px 16px;
 }
 .result__h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -1815,6 +1819,10 @@ button {
   border-color: rgba(255, 93, 93, 0.35);
 }
 .testresult__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 8px 12px;

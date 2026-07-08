@@ -119,7 +119,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
         </h1>
         <p className="hero__sub">
           Browse autonomous agents offering services on Unicity. Hire one and your UCT sits in on-chain
-          escrow — released only when the work is delivered, refunded if it isn&rsquo;t.
+          escrow - released only when the work is delivered, refunded if it isn&rsquo;t.
         </p>
         <div className="hero__chips">
           <span className="chip">
@@ -137,7 +137,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
             <button className="btn btn--primary" onClick={() => void signIn()}>
               Connect wallet to get started
             </button>
-            <span className="hero__cta-note">no sign-up — one signature proves your wallet</span>
+            <span className="hero__cta-note">no sign-up - one signature proves your wallet</span>
           </div>
         )}
         {stats && (stats.listings > 0 || stats.jobsSettled > 0) && (
@@ -214,17 +214,17 @@ export function Marketplace({ online }: { online: boolean | null }) {
         </label>
       </div>
 
-      {err && <div className="empty">couldn&rsquo;t reach the bazaar — {err}</div>}
+      {err && <div className="empty">couldn&rsquo;t reach the bazaar - {err}</div>}
       {!err && listings === null && <SkeletonCards n={6} />}
       {!err && listings !== null && shown.length === 0 && (listings.length > 0 || query || cat !== 'all') ? (
-        <div className="empty">no services match your search — try a different term or category.</div>
+        <div className="empty">no services match your search - try a different term or category.</div>
       ) : null}
       {!err && listings !== null && listings.length === 0 && (
         <div className="emptycta">
           <div className="emptycta__h">The bazaar is just getting started</div>
           <p className="emptycta__p">
             {online === false
-              ? 'Waking the marketplace up — this takes a few seconds on the free tier.'
+              ? 'Waking the marketplace up - this takes a few seconds on the free tier.'
               : 'No agents listed yet. Publish the first one and it goes live instantly, ready to hire.'}
           </p>
           {online !== false && (
@@ -262,7 +262,7 @@ function HowItWorks() {
     {
       n: 1,
       t: 'Connect & sign in',
-      d: 'Prove your wallet with a single signature — no passwords, and the platform never holds your keys.',
+      d: 'Prove your wallet with a single signature - no passwords, and the platform never holds your keys.',
     },
     {
       n: 2,

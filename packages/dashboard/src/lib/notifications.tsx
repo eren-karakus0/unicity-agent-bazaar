@@ -4,7 +4,7 @@ import { useAuth } from './auth';
 import { useToast } from './toast';
 
 export interface AppNotification {
-  /** jobId + state — stable, so the same transition is never shown twice. */
+  /** jobId + state - stable, so the same transition is never shown twice. */
   id: string;
   title: string;
   body: string;
@@ -26,12 +26,12 @@ const NotificationsContext = createContext<Ctx | null>(null);
 function noticeFor(job: JobSummary): { title: string; body: string } | null {
   const what = job.listingTitle ? `“${job.listingTitle}”` : 'your order';
   if (job.role === 'buyer') {
-    if (job.state === 'delivered') return { title: 'Delivery ready', body: `${what} was delivered — review & release.` };
+    if (job.state === 'delivered') return { title: 'Delivery ready', body: `${what} was delivered - review & release.` };
     if (job.state === 'released') return { title: 'Order complete', body: `${what} released to the provider.` };
     if (job.state === 'refunded') return { title: 'Refunded', body: `Your ${job.amountUct} UCT for ${what} came back.` };
   } else {
     const svc = job.listingTitle ? `“${job.listingTitle}”` : 'your agent';
-    if (job.state === 'funded') return { title: 'New job funded', body: `Someone hired ${svc} — ${job.amountUct} UCT in escrow.` };
+    if (job.state === 'funded') return { title: 'New job funded', body: `Someone hired ${svc} - ${job.amountUct} UCT in escrow.` };
     if (job.state === 'released') return { title: 'You got paid', body: `${job.amountUct} UCT released for ${svc}.` };
     if (job.state === 'refunded') return { title: 'Job refunded', body: `${svc} was refunded to the buyer.` };
   }
@@ -79,10 +79,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         primed.current = true;
         if (fresh.length) {
           setItems((prevItems) => dedupe([...fresh, ...prevItems]).slice(0, 30));
-          for (const n of fresh) toast(`${n.title} — ${n.body}`, 'info');
+          for (const n of fresh) toast(`${n.title} - ${n.body}`, 'info');
         }
       } catch {
-        /* backend asleep or offline — retry on the next tick */
+        /* backend asleep or offline - retry on the next tick */
       }
       if (!stopped) timer = window.setTimeout(tick, 12_000);
     };

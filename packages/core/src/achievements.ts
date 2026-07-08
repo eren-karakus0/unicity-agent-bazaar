@@ -1,5 +1,5 @@
 /**
- * Achievements — earned badges derived purely from a principal's activity.
+ * Achievements - earned badges derived purely from a principal's activity.
  * Both sides of the market are recognized: providers for selling well, buyers
  * for participating. Kept a pure function so it is trivially testable and the
  * backend/dashboard can't drift on the rules.

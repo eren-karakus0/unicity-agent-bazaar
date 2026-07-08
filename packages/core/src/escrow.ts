@@ -99,7 +99,7 @@ export function applyEscrowEvent(job: EscrowJob, event: EscrowEvent, now = Date.
 
 /**
  * Whether a delivered job is past its auto-release window and can be released to
- * the provider without explicit buyer acceptance — so an absent buyer can never
+ * the provider without explicit buyer acceptance - so an absent buyer can never
  * strand a provider's payment.
  */
 export function isAutoReleasable(job: EscrowJob, windowMs: number, now = Date.now()): boolean {

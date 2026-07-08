@@ -1,5 +1,5 @@
 /**
- * Text Scout — a reference bazaar provider agent.
+ * Text Scout - a reference bazaar provider agent.
  *
  * Shows the whole third-party integration: wrap a handler with the Agent Kit's
  * `createAgentServer`, and (optionally) auto-publish a listing to a running
@@ -35,7 +35,7 @@ const server = createAgentServer({
     if (BACKEND && PUBLIC_URL) {
       publishToBazaar(BACKEND, {
         agentNametag: NAMETAG,
-        title: 'Text Scout — quick content analysis',
+        title: 'Text Scout - quick content analysis',
         description: 'Send { text } (optionally { url }) and get word/keyword/sentiment stats back.',
         category: 'analysis',
         priceUct: PRICE,

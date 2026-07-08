@@ -1,5 +1,5 @@
 /**
- * Unicity Agent Bazaar — backend.
+ * Unicity Agent Bazaar - backend.
  *
  * Runs the platform's autonomous escrow agent on Unicity testnet2 and exposes
  * the marketplace to the web:
@@ -36,7 +36,7 @@ const auth = new AuthService({
   logger: createLogger('auth'),
 });
 if (env.auth.secretIsEphemeral) {
-  log.warn('BAZAAR_SESSION_SECRET is unset — using a random per-boot secret; logins reset on restart.');
+  log.warn('BAZAAR_SESSION_SECRET is unset - using a random per-boot secret; logins reset on restart.');
 }
 
 const escrowAgent = new SphereAgent({
@@ -132,7 +132,7 @@ async function boot(): Promise<void> {
   setInterval(() => void service?.sweepListingHealth(), 60_000);
 
   ready = true;
-  log.info(`bazaar online — escrow @${escrowAgent.nametag}`);
+  log.info(`bazaar online - escrow @${escrowAgent.nametag}`);
 }
 
 // ---- http helpers ----
@@ -140,7 +140,7 @@ function setCors(res: http.ServerResponse): void {
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
   // `authorization` is REQUIRED here: signed-in requests carry a Bearer token,
-  // which triggers a CORS preflight — omitting it blocks every authed fetch.
+  // which triggers a CORS preflight - omitting it blocks every authed fetch.
   res.setHeader('access-control-allow-headers', 'content-type, authorization');
   res.setHeader('access-control-max-age', '600');
 }
@@ -246,7 +246,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (!service || !ready) {
-    json(res, 503, { error: 'The bazaar is still waking up — try again in a few seconds.' });
+    json(res, 503, { error: 'The bazaar is still waking up - try again in a few seconds.' });
     return;
   }
   const svc = service;
@@ -309,7 +309,7 @@ const server = http.createServer((req, res) => {
         );
         // Probe the provider endpoint so the publish response can tell the owner
         // whether their agent is reachable (the verified badge). The webhook
-        // secret is returned ONCE here — there is no endpoint to read it later.
+        // secret is returned ONCE here - there is no endpoint to read it later.
         void svc.verifyListingHealth(listing.id).then((health) => {
           json(res, 200, {
             listing: svc.decorateListing(listing),

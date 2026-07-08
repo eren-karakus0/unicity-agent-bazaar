@@ -14,7 +14,7 @@ function newAuth(now: () => number = () => Date.now()): AuthService {
   return new AuthService({ sessionSecret: 'test-secret', verify: verifySignedMessage, now });
 }
 
-describe('AuthService — Sign-In-With-Wallet', () => {
+describe('AuthService - Sign-In-With-Wallet', () => {
   it('accepts a correctly signed challenge and issues a usable session', () => {
     const auth = newAuth();
     const wallet = makeWallet();

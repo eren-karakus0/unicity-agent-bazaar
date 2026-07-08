@@ -17,7 +17,7 @@ export interface AgentServerOptions {
   /**
    * The listing's webhook secret (from the publish response). When set, the
    * server verifies each job's `x-bazaar-signature` and rejects unsigned or
-   * forged calls with 401 — so only the real Bazaar can invoke your agent.
+   * forged calls with 401 - so only the real Bazaar can invoke your agent.
    */
   secret?: string;
 }
@@ -26,7 +26,7 @@ const DEFAULT_TOLERANCE_MS = 5 * 60_000;
 
 /**
  * Verify a Bazaar webhook signature. The header is `t=<ms>,v1=<hmac>` and the
- * signature is HMAC-SHA256 over `<t>.<rawBody>` — verify against the RAW request
+ * signature is HMAC-SHA256 over `<t>.<rawBody>` - verify against the RAW request
  * body (before JSON parsing). Rejects stale timestamps to bound replay.
  */
 export function verifyWebhook(opts: {

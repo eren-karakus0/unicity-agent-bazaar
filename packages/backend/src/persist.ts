@@ -5,7 +5,7 @@
  * durable filesystem (local dev, or a server / mounted disk).
  *
  * NOTE: on an ephemeral-filesystem host (e.g. Render's free tier, which
- * destroys the container on sleep), the file does not survive a full restart —
+ * destroys the container on sleep), the file does not survive a full restart -
  * a real database is the fix, deferred to a later phase.
  */
 import fs from 'node:fs';

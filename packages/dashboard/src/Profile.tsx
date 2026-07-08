@@ -74,7 +74,7 @@ export function Profile({ principal }: { principal: string | null }) {
     load();
   }, [load]);
 
-  // Favorites are private — only shown on your own (`#/profile`) view.
+  // Favorites are private - only shown on your own (`#/profile`) view.
   useEffect(() => {
     if (target !== null || !session) {
       setFavorites(null);
@@ -92,7 +92,7 @@ export function Profile({ principal }: { principal: string | null }) {
   if (err) {
     return (
       <div className="empty">
-        <div>couldn&rsquo;t load this profile — the bazaar may be waking up.</div>
+        <div>couldn&rsquo;t load this profile - the bazaar may be waking up.</div>
         <button className="btn btn--primary btn--sm" style={{ marginTop: 16 }} onClick={load}>
           Retry
         </button>

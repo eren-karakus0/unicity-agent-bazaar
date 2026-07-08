@@ -1,7 +1,7 @@
 /**
  * Sign-In-With-Wallet auth for the Agent Bazaar.
  *
- * The wallet's chain key IS the account — there are no passwords and the
+ * The wallet's chain key IS the account - there are no passwords and the
  * platform never holds keys. A login is a one-time challenge the user signs
  * with their Sphere wallet (the `sign_message` intent). The backend verifies
  * the secp256k1 signature against the claimed chain pubkey using the SDK's own
@@ -11,7 +11,7 @@
  * - `chainPubkey` is the cryptographically-proven identity. `nametag` is a
  *   self-chosen display + payment-routing handle; it is NOT a fund-theft vector
  *   (settlement routes to the counterparty's proven pubkey, never to a claimed
- *   nametag — see BazaarService).
+ *   nametag - see BazaarService).
  * - Nonces are single-use and short-lived; the signature verifier is injected
  *   so the crypto (SDK) can be swapped in tests.
  */
@@ -20,7 +20,7 @@ import { Logger, createLogger } from './logger.js';
 
 /** A proven marketplace identity. `chainPubkey` is cryptographically verified. */
 export interface Identity {
-  /** 33-byte compressed secp256k1 pubkey, lowercase hex — the account id. */
+  /** 33-byte compressed secp256k1 pubkey, lowercase hex - the account id. */
   chainPubkey: string;
   /** The wallet's @nametag (display + payment-routing handle), if it has one. */
   nametag?: string;
@@ -33,7 +33,7 @@ export interface Challenge {
   expiresAt: number;
 }
 
-/** Verifies a Sphere signed message — matches the SDK's `verifySignedMessage`. */
+/** Verifies a Sphere signed message - matches the SDK's `verifySignedMessage`. */
 export type MessageVerifier = (message: string, signature: string, expectedPubkey: string) => boolean;
 
 /** 33-byte compressed secp256k1 pubkey, hex (0x02/0x03 prefix + 64 hex chars). */
@@ -99,7 +99,7 @@ export class AuthService {
     const issued = new Date(this.now()).toISOString();
     const expiresAt = this.now() + CHALLENGE_TTL_MS;
     const message = [
-      `${this.domain} — sign in`,
+      `${this.domain} - sign in`,
       '',
       'Sign this message to prove you control this wallet.',
       'It authorizes nothing on-chain and moves no funds.',
@@ -119,8 +119,8 @@ export class AuthService {
   login(input: { nonce: string; signature: string; nametag?: string }): { token: string; identity: Identity } {
     const pending = this.pending.get(input.nonce);
     if (pending) this.pending.delete(input.nonce);
-    if (!pending) throw new Error('challenge not found or already used — request a new one');
-    if (pending.expiresAt < this.now()) throw new Error('challenge expired — request a new one');
+    if (!pending) throw new Error('challenge not found or already used - request a new one');
+    if (pending.expiresAt < this.now()) throw new Error('challenge expired - request a new one');
     const sig = (input.signature ?? '').trim();
     if (!sig) throw new Error('a signature is required');
 
@@ -131,11 +131,11 @@ export class AuthService {
       this.log.warn('signature verification threw', e instanceof Error ? e.message : e);
       ok = false;
     }
-    if (!ok) throw new Error('signature did not match the wallet — login rejected');
+    if (!ok) throw new Error('signature did not match the wallet - login rejected');
 
     const nametag = normalizeNametag(input.nametag);
     const identity: Identity = { chainPubkey: pending.chainPubkey, ...(nametag ? { nametag } : {}) };
-    this.log.info(`login ok — ${principalOf(identity)}`);
+    this.log.info(`login ok - ${principalOf(identity)}`);
     return { token: this.mintToken(identity), identity };
   }
 

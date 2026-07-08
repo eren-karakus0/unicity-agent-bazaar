@@ -27,7 +27,7 @@ import { principalOf, type Identity } from './auth.js';
 import { Logger, createLogger } from './logger.js';
 import { createHealthProber, type HealthProber, type Invoker } from './webhook-client.js';
 
-/** A publish request from an authenticated provider — the server assigns the owner. */
+/** A publish request from an authenticated provider - the server assigns the owner. */
 export type PublishInput = Omit<ListingInput, 'agentNametag'>;
 
 /** A compact job row for profile pages. */
@@ -61,7 +61,7 @@ export type DecoratedListing = Listing & {
   successRate: number;
   /** Last health probe of the provider endpoint (null if never checked). */
   health: ListingHealth | null;
-  /** True when the provider answered a health probe — the "verified" badge. */
+  /** True when the provider answered a health probe - the "verified" badge. */
   verified: boolean;
 };
 
@@ -119,7 +119,7 @@ export interface BazaarSnapshot {
   listingHealth: [string, ListingHealth][];
 }
 
-/** The minimal on-chain surface the service needs — satisfied by SphereAgent. */
+/** The minimal on-chain surface the service needs - satisfied by SphereAgent. */
 export interface BazaarAgent {
   readonly nametag: string;
   readonly uctCoin: { coinId: string; decimals: number };
@@ -238,7 +238,7 @@ export class BazaarService {
     if (!this.reputations.has(agentNametag)) {
       this.reputations.set(agentNametag, newReputation(agentNametag));
     }
-    this.log.info(`listing published: ${listing.slug} — ${listing.priceUct} UCT by ${agentNametag}`);
+    this.log.info(`listing published: ${listing.slug} - ${listing.priceUct} UCT by ${agentNametag}`);
     return listing;
   }
 
@@ -271,7 +271,7 @@ export class BazaarService {
   /**
    * Probe a listing's provider endpoint and record the result. A webhook agent's
    * `/health` sits alongside its job path; a reachable one earns the verified
-   * badge. Never throws — an unreachable endpoint is a recorded `ok:false`.
+   * badge. Never throws - an unreachable endpoint is a recorded `ok:false`.
    */
   async verifyListingHealth(listingId: string): Promise<ListingHealth> {
     const listing = this.listings.get(listingId);
@@ -293,7 +293,7 @@ export class BazaarService {
 
   /**
    * Re-probe every active webhook listing and auto-deactivate any that fails a
-   * few checks in a row — so a dead endpoint stops taking hires. A single
+   * few checks in a row - so a dead endpoint stops taking hires. A single
    * recovery resets the count. House (loopback) agents stay up.
    */
   async sweepListingHealth(strikesToDeactivate = 3): Promise<void> {
@@ -396,7 +396,7 @@ export class BazaarService {
     const memo = (t.memo ?? '').trim();
     if (!memo) return null;
     const jobId = this.escrowIndex.get(memo);
-    if (!jobId) return null; // no matching job (yet) — leave unseen so a later sweep can retry
+    if (!jobId) return null; // no matching job (yet) - leave unseen so a later sweep can retry
     const job = this.jobs.get(jobId);
     if (!job || job.state !== 'quoted') return null;
 
@@ -406,12 +406,12 @@ export class BazaarService {
     } catch {
       return null;
     }
-    if (amount < job.amountUct) return null; // underfunded — ignore until fully funded
+    if (amount < job.amountUct) return null; // underfunded - ignore until fully funded
 
     this.seenFunding.add(t.dedupKey);
     const funded = applyEscrowEvent(job, 'fund');
     this.jobs.set(jobId, funded);
-    this.log.info(`escrow ${job.escrowRef} funded with ${amount} UCT — invoking provider`);
+    this.log.info(`escrow ${job.escrowRef} funded with ${amount} UCT - invoking provider`);
     void this.runJob(funded);
     return funded;
   }
@@ -475,7 +475,7 @@ export class BazaarService {
     return disputed;
   }
 
-  /** Resolve a dispute either way (operator action — gated at the transport). */
+  /** Resolve a dispute either way (operator action - gated at the transport). */
   resolveDispute(jobId: string, outcome: SettlementKind): EscrowJob {
     const job = this.requireJob(jobId);
     const resolved = applyEscrowEvent(job, outcome === 'release' ? 'resolve_release' : 'resolve_refund');
