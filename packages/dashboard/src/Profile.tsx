@@ -1,9 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type EscrowState, type JobSummary, type Listing, type ProfileView } from './lib/api';
+import {
+  api,
+  badgeUrl,
+  type EscrowState,
+  type JobSummary,
+  type Listing,
+  type ProfileView,
+  type TrustScore,
+} from './lib/api';
 import { useAuth } from './lib/auth';
 import { HireDialog } from './HireDialog';
 import { SkeletonProfile } from './Skeletons';
 import { go } from './lib/nav';
+
+const TIER_ICON: Record<TrustScore['tier'], string> = {
+  gold: '◆',
+  silver: '◆',
+  bronze: '◆',
+  new: '○',
+};
+const TIER_HINT: Record<TrustScore['tier'], string> = {
+  gold: 'Gold: proven, highly rated provider',
+  silver: 'Silver: reliable provider with a solid record',
+  bronze: 'Bronze: established provider, building a record',
+  new: 'New: no completed jobs yet',
+};
 
 /** A stable hue from any principal string, for the generated avatar. */
 function hueOf(s: string): number {
@@ -58,6 +79,7 @@ const STATE_TONE: Record<EscrowState, string> = {
 export function Profile({ principal }: { principal: string | null }) {
   const { session } = useAuth();
   const [profile, setProfile] = useState<ProfileView | null>(null);
+  const [trust, setTrust] = useState<TrustScore | null>(null);
   const [favorites, setFavorites] = useState<Listing[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [hiring, setHiring] = useState<Listing | null>(null);
@@ -71,8 +93,23 @@ export function Profile({ principal }: { principal: string | null }) {
 
   useEffect(() => {
     setProfile(null);
+    setTrust(null);
     load();
   }, [load]);
+
+  // Trust score is derived from the same principal the profile resolves to.
+  useEffect(() => {
+    const p = profile?.principal;
+    if (!p) return;
+    let live = true;
+    api
+      .trust(p)
+      .then((t) => live && setTrust(t))
+      .catch(() => live && setTrust(null));
+    return () => {
+      live = false;
+    };
+  }, [profile?.principal]);
 
   // Favorites are private - only shown on your own (`#/profile`) view.
   useEffect(() => {
@@ -120,6 +157,13 @@ export function Profile({ principal }: { principal: string | null }) {
             </div>
           )}
           <div className="prof__reptags">
+            {trust && (
+              <span className={`tier tier--${trust.tier}`} title={TIER_HINT[trust.tier]}>
+                <span className="tier__i">{TIER_ICON[trust.tier]}</span>
+                {trust.tier}
+                {trust.tier !== 'new' && <span className="tier__s">{trust.score}</span>}
+              </span>
+            )}
             <span className={`repbadge ${rep.jobsCompleted > 0 ? 'repbadge--on' : ''}`}>
               {rep.jobsCompleted > 0 ? `${rep.jobsCompleted} jobs · ${Math.round(rep.successRate * 100)}%` : 'new'}
             </span>
@@ -214,6 +258,8 @@ export function Profile({ principal }: { principal: string | null }) {
         </>
       )}
 
+      {isMe && trust && <EmbedBadge principal={profile.principal} trust={trust} />}
+
       <div className="actgrid">
         <ActivityColumn title="Sold" empty="no jobs sold yet" jobs={profile.asProvider} />
         <ActivityColumn title="Bought" empty="no jobs bought yet" jobs={profile.asBuyer} />
@@ -269,6 +315,47 @@ function ProfileListingCard({
         </button>
       </div>
     </article>
+  );
+}
+
+function EmbedBadge({ principal, trust }: { principal: string; trust: TrustScore }) {
+  const [copied, setCopied] = useState(false);
+  const src = badgeUrl(principal);
+  const handle = principal.startsWith('@') ? principal : `@${principal.slice(0, 8)}`;
+  const snippet = `<a href="${window.location.origin}/#/agent/${encodeURIComponent(principal)}">\n  <img src="${src}" alt="Unicity Bazaar trust: ${trust.tier} ${trust.score}" height="20">\n</a>`;
+
+  const copy = () => {
+    navigator.clipboard
+      .writeText(snippet)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => undefined);
+  };
+
+  return (
+    <>
+      <div className="sec">
+        <span className="sec__t">Trust badge</span>
+        <span className="sec__c">live, self-updating</span>
+      </div>
+      <div className="embed">
+        <div className="embed__preview">
+          <img src={src} alt={`trust badge for ${handle}`} height={20} />
+          <span className="embed__hint">{TIER_HINT[trust.tier]}</span>
+        </div>
+        <div className="embed__snip">
+          <div className="embed__snip-h">
+            <span>Embed on your site or README</span>
+            <button className={`btn btn--sm ${copied ? 'btn--ok' : ''}`} onClick={copy}>
+              {copied ? '✓ copied' : 'Copy'}
+            </button>
+          </div>
+          <pre className="embed__code">{snippet}</pre>
+        </div>
+      </div>
+    </>
   );
 }
 

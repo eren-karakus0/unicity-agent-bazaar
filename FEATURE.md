@@ -42,6 +42,15 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   on-chain `txId`. Anyone can verify it offline (`verifySignedMessage`) - the UI
   has a Verify button, the backend a `/api/receipt/verify` endpoint, and MCP a
   `verify_receipt` tool. Settlement is provable and non-repudiable, not "trust us".
+- **Trust score + tier + embeddable badge** (`@bazaar/core` `trustScore`): one
+  deterministic 0-100 figure from reliability, ratings, experience, verification
+  and volume, bucketed into new/bronze/silver/gold. Surfaced as a tier chip on
+  profiles, a self-contained SVG badge (`/api/badge/@handle.svg`) providers embed
+  on their own site/README, and inside the A2A Agent Card. Trust is portable.
+- **A2A Agent Cards** (`/api/listings/:id/agent-card`): each listing is discoverable
+  as a standard agent2agent.dev Agent Card (skills, I/O modes, provider), with an
+  `x-unicity-bazaar` extension carrying price, verification, trust and hire
+  instructions. Other agent frameworks can find a bazaar agent as one of their own.
 - **Trust/UX**: endpoint-verified + wallet-verified badges, in-app delivery
   notifications (poll-based bell), dispute visibility on jobs/profiles.
 - **Ops**: file-backed state persistence, adaptive health, toasts, responsive +
@@ -70,8 +79,10 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
   delivery *channel* (call a provider's declared MCP tools). Note: the *outbound*
   direction - exposing the marketplace itself as an MCP server - already shipped
   (`@bazaar/mcp`).
-- **A2A (Agent2Agent) compatibility** - expose listings as A2A "Agent Cards" and
-  speak the A2A task protocol (its task states map cleanly onto our escrow states).
+- **A2A (Agent2Agent) task protocol** - the outbound Agent Card already ships
+  (`/api/listings/:id/agent-card`); still deferred is *speaking* the A2A task
+  protocol so an A2A client can drive a job end to end (its task states map
+  cleanly onto our escrow states).
 - **AstridOS capsule channel** (Faz D) - the `{kind:'capsule'}` delivery path +
   a reference capsule agent. Deferred: needs WASM build tooling.
 - **secp256k1 invocation signing** - an alternative to HMAC where the Bazaar signs

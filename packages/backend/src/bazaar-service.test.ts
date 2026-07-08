@@ -413,6 +413,25 @@ describe('BazaarService - settlement receipts (on-chain proof)', () => {
   });
 });
 
+describe('BazaarService - trust score', () => {
+  it('is "new" for an unknown principal and rises after a completed, reviewed job', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    expect(svc.trustOf('@nobody').tier).toBe('new');
+
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+    svc.postReview({ jobId: hire.job.jobId, stars: 5 }, buyer);
+
+    const t = svc.trustOf('@scout');
+    expect(t.score).toBeGreaterThan(0);
+    expect(['bronze', 'silver', 'gold']).toContain(t.tier);
+  });
+});
+
 describe('BazaarService - nested escrow (agent sub-hiring)', () => {
   const provider2: Identity = { chainPubkey: `02${'f'.repeat(64)}`, nametag: 'helper' };
   const publishInput2: PublishInput = { ...publishInput, title: 'Sub task', channel: { kind: 'webhook', url: 'https://helper.example.com/hook' } };

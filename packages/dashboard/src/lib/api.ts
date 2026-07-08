@@ -190,6 +190,12 @@ export interface DepositInfo {
   symbol: string;
 }
 
+export type Tier = 'new' | 'bronze' | 'silver' | 'gold';
+export interface TrustScore {
+  score: number;
+  tier: Tier;
+}
+
 export interface Identity {
   chainPubkey: string;
   nametag?: string;
@@ -310,4 +316,13 @@ export const api = {
     get<{ reviews: Review[] }>(`/api/reviews/${encodeURIComponent(principal)}`).then((r) => r.reviews),
   verifyReceipt: (signed: SignedReceipt) =>
     post<{ valid: boolean; signer: string }>('/api/receipt/verify', signed),
+  trust: (principal: string) =>
+    get<{ trust: TrustScore }>(`/api/trust/${encodeURIComponent(principal.replace(/^@/, ''))}`).then(
+      (r) => r.trust,
+    ),
 };
+
+/** Absolute URL of the self-contained trust badge SVG for a principal (embeddable anywhere). */
+export function badgeUrl(principal: string): string {
+  return `${BASE}/api/badge/${encodeURIComponent(principal.replace(/^@/, ''))}.svg`;
+}

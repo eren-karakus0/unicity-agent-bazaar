@@ -20,10 +20,12 @@ import { canonicalReceipt, type InputField, type SettlementReceipt } from '@baza
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
-import { BazaarService, type BazaarSnapshot } from './bazaar-service.js';
+import { BazaarService, toPrincipal, type BazaarSnapshot } from './bazaar-service.js';
 import { AuthService, principalOf, type Identity } from './auth.js';
 import { createHealthProber, createWebhookInvoker } from './webhook-client.js';
 import { startHouseAgents } from './house-agents.js';
+import { renderBadge } from './badge.js';
+import { buildAgentCard } from './agent-card.js';
 import { loadSnapshot, saveSnapshot } from './persist.js';
 
 const env = loadEnv();
@@ -163,6 +165,14 @@ function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/** Reconstruct this deployment's public base URL from the request (for A2A cards). */
+function baseUrlOf(req: http.IncomingMessage): string {
+  const host = (req.headers['host'] as string) ?? 'localhost';
+  const fwd = str(req.headers['x-forwarded-proto'])?.split(',')[0]?.trim();
+  const proto = fwd ?? (/^(localhost|127\.|\[::1\])/.test(host) ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
 
 /** Coerce a request body's `inputSchema` into declared fields (core validates them). */
 function parseInputSchema(v: unknown): InputField[] | undefined {
@@ -502,6 +512,39 @@ const server = http.createServer((req, res) => {
       return;
     }
     json(res, 200, { profile: svc.profileOf(raw) });
+    return;
+  }
+
+  // Trust score (JSON) for a provider.
+  const trustMatch = pathname.match(/^\/api\/trust\/(.+)$/);
+  if (trustMatch && method === 'GET') {
+    json(res, 200, { trust: svc.trustOf(decodeURIComponent(trustMatch[1]!)) });
+    return;
+  }
+
+  // Embeddable trust badge (SVG); providers put this on their own site.
+  const badgeMatch = pathname.match(/^\/api\/badge\/(.+)\.svg$/);
+  if (badgeMatch && method === 'GET') {
+    const principal = toPrincipal(decodeURIComponent(badgeMatch[1]!));
+    const t = svc.trustOf(principal);
+    res.writeHead(200, {
+      'content-type': 'image/svg+xml; charset=utf-8',
+      'cache-control': 'public, max-age=300',
+    });
+    res.end(renderBadge(principal, t.score, t.tier));
+    return;
+  }
+
+  // A2A Agent Card for a listing (interop with the agent2agent ecosystem).
+  const cardMatch = pathname.match(/^\/api\/listings\/([^/]+)\/agent-card$/);
+  if (cardMatch && method === 'GET') {
+    const listing = svc.getListing(decodeURIComponent(cardMatch[1]!));
+    if (!listing) {
+      json(res, 404, { error: 'no such listing' });
+      return;
+    }
+    const decorated = svc.decorateListing(listing);
+    json(res, 200, buildAgentCard(decorated, svc.trustOf(listing.agentNametag), baseUrlOf(req)));
     return;
   }
 

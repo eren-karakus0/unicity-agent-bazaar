@@ -11,6 +11,7 @@ import {
   newReputation,
   openEscrow,
   reputationView,
+  trustScore,
   validateReview,
   type Achievement,
   type EscrowJob,
@@ -24,6 +25,7 @@ import {
   type ServiceResult,
   type SettlementReceipt,
   type SignedReceipt,
+  type TrustScore,
 } from '@bazaar/core';
 import crypto from 'node:crypto';
 import { principalOf, type Identity } from './auth.js';
@@ -661,6 +663,24 @@ export class BazaarService {
   reputationOf(nametag: string): ReputationView {
     const key = toPrincipal(nametag);
     return reputationView(this.reputations.get(key) ?? newReputation(key));
+  }
+
+  /** A provider's synthesized 0-100 trust score + tier (reputation + verified). */
+  trustOf(principal: string): TrustScore {
+    const key = toPrincipal(principal);
+    const rep = this.reputations.get(key);
+    const view = reputationView(rep ?? newReputation(key));
+    const verified = [...this.listings.values()].some(
+      (l) => l.active && l.agentNametag === key && this.listingHealth.get(l.id)?.ok === true,
+    );
+    return trustScore({
+      jobsCompleted: view.jobsCompleted,
+      successRate: view.successRate,
+      avgRating: view.avgRating,
+      ratingCount: rep?.ratingCount ?? 0,
+      volumeUct: view.volumeUct,
+      verified,
+    });
   }
 
   /** Everything a profile page needs about one principal (@nametag or pubkey). */
