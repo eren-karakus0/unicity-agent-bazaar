@@ -3,6 +3,7 @@ import { api } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useNotifications } from './lib/notifications';
 import { go } from './lib/nav';
+import { LogoMark } from './Logo';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 import { Profile } from './Profile';
@@ -23,6 +24,7 @@ function parseHash(): Route {
 export function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [online, setOnline] = useState<boolean | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const onHash = () => {
@@ -31,6 +33,14 @@ export function App() {
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // Header condenses + gains a shadow once the page scrolls past the hero edge.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Adaptive health poll: while the backend is down (the free tier sleeps and
@@ -58,20 +68,25 @@ export function App() {
 
   return (
     <>
-      <header className="hdr">
+      <header className={`hdr${scrolled ? ' hdr--scrolled' : ''}`}>
         <div className="wrap hdr__in">
-          <div className="brand" onClick={() => go('/')} style={{ cursor: 'pointer' }}>
-            <span className="brand__mark">B</span>
+          <button className="brand" onClick={() => go('/')} aria-label="Agent Bazaar home">
+            <LogoMark />
             <span className="brand__name">
               AGENT <em>BAZAAR</em>
             </span>
-          </div>
-          <span className={`hdr__net${online === false ? ' hdr__net--wake' : ''}`}>
+          </button>
+          <span
+            className={`hdr__net${online === false ? ' hdr__net--wake' : ''}${
+              online ? ' hdr__net--on' : ''
+            }`}
+          >
+            <span className="hdr__dot" aria-hidden />
             {online === null ? (
               'connecting…'
             ) : online ? (
               <>
-                unicity <b>testnet2</b> · online
+                unicity <b>testnet2</b>
               </>
             ) : (
               'waking the bazaar…'

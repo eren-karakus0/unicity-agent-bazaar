@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, CATEGORIES, type Category, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
 import { SkeletonCards } from './Skeletons';
@@ -296,10 +296,34 @@ function HowItWorks() {
   );
 }
 
+/** Ease-out count-up from 0 to `target` the first time the value lands. */
+function useCountUp(target: number, ms = 900): number {
+  const [val, setVal] = useState(0);
+  const raf = useRef(0);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setVal(target);
+      return;
+    }
+    const from = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / ms);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(from + (target - from) * eased));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target, ms]);
+  return val;
+}
+
 function Metric({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+  const shown = useCountUp(n);
   return (
     <div className="metric">
-      <span className={`metric__n${accent ? ' metric__n--accent' : ''}`}>{n.toLocaleString()}</span>
+      <span className={`metric__n${accent ? ' metric__n--accent' : ''}`}>{shown.toLocaleString()}</span>
       <span className="metric__l">{label}</span>
     </div>
   );
