@@ -16,6 +16,10 @@ export interface BazaarEnv {
   walletApiUrl: string;
   /** The platform's autonomous escrow agent. */
   escrow: { nametag: string; mnemonic?: string };
+  /** Broadcast listings to / read from Unicity's decentralized market feed. */
+  market: boolean;
+  /** Public base URL of this deployment (woven into posted market intents). */
+  publicUrl?: string;
   port: number;
   /** How long a delivered job waits before it auto-releases to the provider. */
   autoReleaseMs: number;
@@ -73,6 +77,9 @@ export function loadEnv(): BazaarEnv {
       nametag: clean(process.env.BAZAAR_ESCROW_NAMETAG) ?? 'bazaar-escrow-knkchn',
       mnemonic: clean(process.env.BAZAAR_ESCROW_MNEMONIC),
     },
+    // Market feed defaults ON; set BAZAAR_MARKET=0 to disable (e.g. offline dev).
+    market: !/^(0|false|off|no)$/i.test(clean(process.env.BAZAAR_MARKET) ?? '1'),
+    publicUrl: clean(process.env.BAZAAR_PUBLIC_URL),
     port: Number(clean(process.env.PORT) ?? clean(process.env.BACKEND_PORT) ?? '4600'),
     autoReleaseMs: Math.max(1, autoReleaseMin) * 60_000,
     dataRoot: path.join(repoRoot, 'data'),

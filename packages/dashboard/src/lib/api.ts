@@ -196,6 +196,20 @@ export interface TrustScore {
   tier: Tier;
 }
 
+/** A listing/intent surfaced from Unicity's decentralized market feed. */
+export interface DiscoverItem {
+  id: string;
+  title: string;
+  description: string;
+  agent?: string;
+  category?: string;
+  priceUct?: number;
+  currency?: string;
+  contactHandle?: string;
+  createdAt: number;
+  source: 'unicity';
+}
+
 export interface Identity {
   chainPubkey: string;
   nametag?: string;
@@ -320,6 +334,13 @@ export const api = {
     get<{ trust: TrustScore }>(`/api/trust/${encodeURIComponent(principal.replace(/^@/, ''))}`).then(
       (r) => r.trust,
     ),
+
+  // ---- Unicity decentralized market feed ----
+  marketStatus: () => get<{ enabled: boolean; available: boolean }>('/api/market/status'),
+  marketFeed: (n = 24) =>
+    get<{ items: DiscoverItem[]; available: boolean }>(`/api/market/feed?n=${n}`),
+  marketSearch: (q: string) =>
+    get<{ items: DiscoverItem[]; available: boolean }>(`/api/market/search?q=${encodeURIComponent(q)}`),
 };
 
 /** Absolute URL of the self-contained trust badge SVG for a principal (embeddable anywhere). */

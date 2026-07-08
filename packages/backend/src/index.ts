@@ -26,6 +26,7 @@ import { createHealthProber, createWebhookInvoker } from './webhook-client.js';
 import { startHouseAgents } from './house-agents.js';
 import { renderBadge } from './badge.js';
 import { buildAgentCard } from './agent-card.js';
+import { MarketBridge } from './market-bridge.js';
 import { loadSnapshot, saveSnapshot } from './persist.js';
 
 const env = loadEnv();
@@ -51,10 +52,12 @@ const escrowAgent = new SphereAgent({
   mnemonic: env.escrow.mnemonic,
   mnemonicEnvHint: 'BAZAAR_ESCROW_MNEMONIC',
   deviceId: 'bazaar-escrow',
+  enableMarket: env.market,
   logger: createLogger('escrow'),
 });
 
 let service: BazaarService | null = null;
+let market: MarketBridge | null = null;
 let ready = false;
 
 const snapshotFile = path.join(env.dataRoot, 'bazaar-state.json');
@@ -132,6 +135,25 @@ async function boot(): Promise<void> {
   setInterval(() => service?.sweepAutoRelease(), 20_000);
   // Periodically re-probe provider endpoints; auto-deactivate ones that go dark.
   setInterval(() => void service?.sweepListingHealth(), 60_000);
+
+  // Bridge to Unicity's decentralized market feed (best-effort; never blocks).
+  if (env.market) {
+    market = new MarketBridge({
+      market: () => escrowAgent.market,
+      baseUrl: env.publicUrl,
+      logger: createLogger('market'),
+    });
+    if (market.available) {
+      log.info('market feed available - broadcasting active listings');
+      void (async () => {
+        for (const listing of svcRef.getListings()) {
+          await market?.publish(listing);
+        }
+      })();
+    } else {
+      log.info('market module not available on this wallet - feed disabled');
+    }
+  }
 
   ready = true;
   log.info(`bazaar online - escrow @${escrowAgent.nametag}`);
@@ -338,6 +360,9 @@ const server = http.createServer((req, res) => {
           },
           identity,
         );
+        // Broadcast the new listing to Unicity's decentralized market feed so it
+        // is discoverable network-wide (best-effort; never blocks the response).
+        void market?.publish(listing);
         // Probe the provider endpoint so the publish response can tell the owner
         // whether their agent is reachable (the verified badge). The webhook
         // secret is returned ONCE here - there is no endpoint to read it later.
@@ -545,6 +570,26 @@ const server = http.createServer((req, res) => {
     }
     const decorated = svc.decorateListing(listing);
     json(res, 200, buildAgentCard(decorated, svc.trustOf(listing.agentNametag), baseUrlOf(req)));
+    return;
+  }
+
+  // ---- Unicity decentralized market feed ----
+  if (pathname === '/api/market/status' && method === 'GET') {
+    json(res, 200, { enabled: env.market, available: market?.available ?? false });
+    return;
+  }
+  if (pathname === '/api/market/feed' && method === 'GET') {
+    const n = Math.min(50, Math.max(1, Number(url.searchParams.get('n')) || 24));
+    void (market?.feed(n) ?? Promise.resolve([])).then((items) =>
+      json(res, 200, { items, available: market?.available ?? false }),
+    );
+    return;
+  }
+  if (pathname === '/api/market/search' && method === 'GET') {
+    const q = url.searchParams.get('q') ?? '';
+    void (market?.search(q) ?? Promise.resolve([])).then((items) =>
+      json(res, 200, { items, available: market?.available ?? false }),
+    );
     return;
   }
 

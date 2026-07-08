@@ -7,6 +7,7 @@ import {
   parseTokenAmount,
   toHumanReadable,
 } from '@unicitylabs/sphere-sdk';
+import type { MarketModule } from '@unicitylabs/sphere-sdk';
 import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
 import { createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/shared/wallet-api';
 import { Logger, createLogger } from './logger.js';
@@ -31,6 +32,8 @@ export interface SphereAgentOptions {
   mnemonic?: string;
   /** Env var name to suggest in the "new wallet" log (defaults to NAME_MNEMONIC). */
   mnemonicEnvHint?: string;
+  /** Enable the SDK Market module (decentralized intent feed). Default off. */
+  enableMarket?: boolean;
   logger?: Logger;
 }
 
@@ -85,6 +88,9 @@ export class SphereAgent {
       ...providers,
       network: 'testnet2' as const,
       nametag: this.desiredNametag,
+      // The Market module (decentralized 'intent' feed) is optional and additive;
+      // enable it only where asked so a feed/relay hiccup can't slow other agents.
+      ...(this.opts.enableMarket ? { market: true as const } : {}),
     };
     const initOptions = this.opts.mnemonic
       ? { ...common, mnemonic: this.opts.mnemonic }
@@ -126,6 +132,10 @@ export class SphereAgent {
   }
   get chainPubkey(): string | undefined {
     return this.inner?.identity?.chainPubkey;
+  }
+  /** The SDK Market module if enabled + available, else null. */
+  get market(): MarketModule | null {
+    return this.inner?.market ?? null;
   }
 
   /** Sign a plaintext with the wallet identity key (verifiable via verifySignedMessage). */

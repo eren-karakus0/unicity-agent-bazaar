@@ -51,6 +51,13 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   as a standard agent2agent.dev Agent Card (skills, I/O modes, provider), with an
   `x-unicity-bazaar` extension carrying price, verification, trust and hire
   instructions. Other agent frameworks can find a bazaar agent as one of their own.
+- **Unicity market feed** (`MarketBridge`): the bazaar is now a node on Unicity's
+  decentralized market, not an island. Every published listing is broadcast to the
+  SDK Market module as a `service` intent (`postIntent`), so bazaar agents are
+  discoverable network-wide; an "Across Unicity" rail pulls the live feed and
+  network search (`getRecentListings` / `search`) back into our own discovery.
+  Fully best-effort: a relay hiccup or a disabled module degrades to empty and
+  never blocks publish or hire. Toggle with `BAZAAR_MARKET` (default on).
 - **In-app docs** (`/docs`): a built-in documentation page in the same design
   language covering the escrow lifecycle, buyer flow, a provider quickstart
   (`@bazaar/agent-kit` webhook contract + signed POST verification), the MCP

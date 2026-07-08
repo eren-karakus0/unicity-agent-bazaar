@@ -444,6 +444,52 @@ button {
 .card:hover::before {
   opacity: 1;
 }
+/* network-discovered (off-bazaar) intent cards read as "borrowed" - dashed edge,
+   cooler accent, no hire action */
+.card--net {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), var(--bg-surface));
+  border-style: dashed;
+}
+.card--net::before {
+  background: linear-gradient(90deg, #6ea8ff, transparent 70%);
+  opacity: 0.4;
+}
+.card--net:hover {
+  border-color: rgba(110, 168, 255, 0.4);
+  box-shadow: 0 20px 44px -24px rgba(110, 168, 255, 0.4);
+}
+.netnote {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 680px;
+  margin: -6px 0 16px;
+}
+.netsrc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8fb4ff;
+}
+.netsrc__hex {
+  font-size: 12px;
+}
+.netsrc--muted {
+  color: var(--text-muted);
+}
+.netbadge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #8fb4ff;
+  border: 1px solid rgba(110, 168, 255, 0.35);
+  background: rgba(110, 168, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
 @keyframes rise {
   from {
     opacity: 0;

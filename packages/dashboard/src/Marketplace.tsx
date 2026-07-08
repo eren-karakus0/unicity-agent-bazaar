@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, CATEGORIES, type Category, type Listing } from './lib/api';
+import { api, CATEGORIES, type Category, type DiscoverItem, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
 import { SkeletonCards } from './Skeletons';
 import { useAuth } from './lib/auth';
@@ -36,12 +36,36 @@ export function Marketplace({ online }: { online: boolean | null }) {
   const [hiring, setHiring] = useState<Listing | null>(null);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof api.stats>> | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [net, setNet] = useState<DiscoverItem[] | null>(null);
+  const [netOn, setNetOn] = useState(false);
 
   useEffect(() => {
     api.listings().then(setListings).catch((e) => setErr(e instanceof Error ? e.message : 'failed'));
     api.trending(4).then(setTrending).catch(() => {});
     api.stats().then(setStats).catch(() => {});
+    api
+      .marketStatus()
+      .then((s) => setNetOn(s.available))
+      .catch(() => setNetOn(false));
   }, []);
+
+  // Unicity decentralized feed: browse recent network intents, or search across
+  // the network when there's a query. Debounced so typing doesn't spam the relay.
+  useEffect(() => {
+    if (!netOn) return;
+    const q = query.trim();
+    let live = true;
+    const t = setTimeout(() => {
+      const req = q ? api.marketSearch(q) : api.marketFeed(12);
+      req
+        .then((r) => live && setNet(r.items))
+        .catch(() => live && setNet([]));
+    }, q ? 350 : 0);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [netOn, query]);
 
   // Load which listings the signed-in user has favorited.
   useEffect(() => {
@@ -250,6 +274,26 @@ export function Marketplace({ online }: { online: boolean | null }) {
         </div>
       )}
 
+      {netOn && net && net.length > 0 && (
+        <>
+          <div className="sec">
+            <span className="sec__t">Across Unicity</span>
+            <span className="sec__c">
+              {query.trim() ? `network results for “${query.trim()}”` : 'live from the decentralized feed'}
+            </span>
+          </div>
+          <p className="netnote">
+            Intents discovered on Unicity&rsquo;s open market feed - beyond this bazaar. Our own
+            listings are broadcast here too, so agents anywhere can find them.
+          </p>
+          <div className="grid">
+            {net.map((it, i) => (
+              <NetCard key={`${it.source}-${it.id}`} item={it} delay={i * 0.04} />
+            ))}
+          </div>
+        </>
+      )}
+
       <HowItWorks />
 
       {hiring && <HireDialog listing={hiring} onClose={() => setHiring(null)} />}
@@ -317,6 +361,49 @@ function useCountUp(target: number, ms = 900): number {
     return () => cancelAnimationFrame(raf.current);
   }, [target, ms]);
   return val;
+}
+
+function ago(ts: number): string {
+  const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+/** A read-only card for an intent discovered on the Unicity network (not hireable
+ *  through our escrow - it lives elsewhere on the open feed). */
+function NetCard({ item, delay }: { item: DiscoverItem; delay: number }) {
+  return (
+    <article className="card card--net" style={{ animationDelay: `${delay}s` }}>
+      <div className="card__top">
+        <span className="netsrc">
+          <span className="netsrc__hex">⬡</span> Unicity feed
+        </span>
+        <span className="card__rep">{ago(item.createdAt)}</span>
+      </div>
+      <div>
+        <div className="card__title">{item.title}</div>
+        {item.agent && <div className="card__agent">@{item.agent}</div>}
+      </div>
+      <p className="card__desc">{item.description}</p>
+      <div className="card__foot">
+        {item.priceUct != null ? (
+          <span className="price">
+            {item.priceUct}
+            <em>{item.currency ?? 'UCT'}</em>
+          </span>
+        ) : (
+          <span className="netsrc netsrc--muted">{item.category ?? 'intent'}</span>
+        )}
+        <span className="netbadge" title="Discovered on the decentralized market feed">
+          off-bazaar
+        </span>
+      </div>
+    </article>
+  );
 }
 
 function Metric({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
