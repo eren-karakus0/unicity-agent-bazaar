@@ -12,6 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { canonicalReceipt } from '@bazaar/core';
+import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { z } from 'zod';
 import { BazaarClient, type ListingLite, type Signer } from './client.js';
 import { McpWallet } from './wallet.js';
@@ -184,6 +186,11 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
         }
         if (v.job.state === 'delivered') lines.push('\nCall accept_job to release the funds (or dispute if wrong).');
         if (v.settlement) lines.push(`\nsettlement: ${v.settlement.status} (${v.settlement.kind})`);
+        if (v.receipt) {
+          lines.push(
+            `\nsigned settlement receipt available (signer ${v.receipt.signer.slice(0, 12)}…) — call verify_receipt to check it independently.`,
+          );
+        }
         return ok(lines.join('\n'));
       } catch (e) {
         return fail(errMsg(e));
@@ -205,6 +212,35 @@ function buildServer(client: BazaarClient, getWallet: () => McpWallet | null): M
         return ok(`Released. Job ${jobId} is now "${job.state}" — the provider has been paid.`);
       } catch (e) {
         return fail(`Accept failed: ${errMsg(e)}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'verify_receipt',
+    {
+      title: 'Verify a settlement receipt',
+      description:
+        "Independently verify a job's settlement receipt: checks the escrow wallet's signature over the canonical receipt with secp256k1 — locally, without trusting the API. Proves the job settled exactly as stated.",
+      inputSchema: { jobId: z.string() },
+    },
+    async ({ jobId }) => {
+      try {
+        const v = await client.job(jobId);
+        if (!v.receipt) return ok(`Job ${jobId} has no settlement receipt yet (it must settle first).`);
+        const { receipt, signature, signer } = v.receipt;
+        const valid = verifySignedMessage(canonicalReceipt(receipt), signature, signer);
+        return ok(
+          [
+            valid ? '✓ VALID — signature verifies against the escrow key.' : '✗ INVALID — signature does not match.',
+            `outcome: ${receipt.outcome} of ${receipt.amountUct} UCT`,
+            `recipient: ${receipt.recipient}`,
+            `signer (escrow): ${signer}`,
+            receipt.txId ? `on-chain tx: ${receipt.txId}` : 'on-chain tx: (pending / none recorded)',
+          ].join('\n'),
+        );
+      } catch (e) {
+        return fail(errMsg(e));
       }
     },
   );

@@ -16,7 +16,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
-import type { InputField } from '@bazaar/core';
+import { canonicalReceipt, type InputField, type SettlementReceipt } from '@bazaar/core';
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
@@ -242,6 +242,27 @@ const server = http.createServer((req, res) => {
       return;
     }
     json(res, 200, { identity });
+    return;
+  }
+
+  // Verify a settlement receipt's signature against its claimed signer. Pure
+  // crypto — anyone can call it (or verify offline with the Sphere SDK).
+  if (pathname === '/api/receipt/verify' && method === 'POST') {
+    void readJson(req).then((body) => {
+      try {
+        const receipt = body.receipt as SettlementReceipt | undefined;
+        const signature = str(body.signature);
+        const signer = str(body.signer);
+        if (!receipt || !signature || !signer) {
+          json(res, 400, { error: 'receipt, signature and signer are required' });
+          return;
+        }
+        const valid = verifySignedMessage(canonicalReceipt(receipt), signature, signer);
+        json(res, 200, { valid, signer });
+      } catch (e) {
+        json(res, 400, { valid: false, error: e instanceof Error ? e.message : 'verification failed' });
+      }
+    });
     return;
   }
 

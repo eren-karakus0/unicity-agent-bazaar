@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DeliveryChannel, ServiceInvocation, ServiceResult } from '@bazaar/core';
+import { canonicalReceipt } from '@bazaar/core';
+import { getPublicKey, signMessage, verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { BazaarService, type BazaarAgent, type PublishInput } from './bazaar-service.js';
 import type { Identity } from './auth.js';
 import type { Invoker } from './webhook-client.js';
@@ -349,6 +351,65 @@ describe('BazaarService - publish hardening (health + test invoke)', () => {
     expect(seen?.escrowRef.startsWith('test-')).toBe(true);
 
     await expect(svc.testInvoke(listing.id, buyer, {})).rejects.toThrow(/only the listing owner/);
+  });
+});
+
+describe('BazaarService - settlement receipts (on-chain proof)', () => {
+  const ESCROW_PRIV = 'a'.repeat(64);
+  const ESCROW_PUB = getPublicKey(ESCROW_PRIV, true);
+
+  // A stub escrow agent that can also sign receipts with a known key.
+  const signingAgent = (sent: Sent[]): BazaarAgent => ({
+    ...stubAgent(sent),
+    chainPubkey: ESCROW_PUB,
+    signMessage: (m) => signMessage(ESCROW_PRIV, m),
+  });
+
+  it('mints a receipt on release that verifies against the escrow key', async () => {
+    const svc = new BazaarService({ agent: signingAgent([]), invoke: invoker('ok') });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+
+    const view = svc.getJob(hire.job.jobId)!;
+    expect(view.receipt).toBeDefined();
+    const { receipt, signature, signer } = view.receipt!;
+    expect(receipt.outcome).toBe('release');
+    expect(receipt.recipient).toBe(provider.chainPubkey);
+    expect(signer).toBe(ESCROW_PUB);
+    // independently verifiable, and tamper-evident
+    expect(verifySignedMessage(canonicalReceipt(receipt), signature, signer)).toBe(true);
+    expect(verifySignedMessage(canonicalReceipt({ ...receipt, amountUct: 999 }), signature, signer)).toBe(false);
+  });
+
+  it('signs a refund receipt too, and survives snapshot/restore', async () => {
+    const svc = new BazaarService({ agent: signingAgent([]), invoke: invoker('fail') });
+    const listing = svc.publishListing(publishInput, provider);
+    const hire = svc.hire({ listingId: listing.id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    await svc.flushPayouts();
+
+    expect(svc.getJob(hire.job.jobId)?.receipt?.receipt.outcome).toBe('refund');
+
+    const fresh = new BazaarService({ agent: signingAgent([]), invoke: invoker('ok') });
+    fresh.restore(JSON.parse(JSON.stringify(svc.snapshot())));
+    const r = fresh.getJob(hire.job.jobId)?.receipt;
+    expect(r).toBeDefined();
+    expect(verifySignedMessage(canonicalReceipt(r!.receipt), r!.signature, r!.signer)).toBe(true);
+  });
+
+  it('mints no receipt when the agent cannot sign', async () => {
+    const svc = new BazaarService({ agent: stubAgent([]), invoke: invoker('ok') });
+    const hire = svc.hire({ listingId: svc.publishListing(publishInput, provider).id, buyer });
+    fund(svc, hire);
+    await svc.flushJobs();
+    svc.acceptJob(hire.job.jobId, buyer);
+    await svc.flushPayouts();
+    expect(svc.getJob(hire.job.jobId)?.receipt).toBeUndefined();
   });
 });
 

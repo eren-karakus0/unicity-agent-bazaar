@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type EscrowState, type HireResult, type InputField, type JobView, type Listing, type Review } from './lib/api';
+import {
+  api,
+  type EscrowState,
+  type HireResult,
+  type InputField,
+  type JobView,
+  type Listing,
+  type Review,
+  type SignedReceipt,
+} from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
 import { buildInput, firstMissingRequired, initialValues, type FieldValues } from './lib/schema';
@@ -254,6 +263,7 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                   }}
                 />
               )}
+              {jobv?.receipt && <ReceiptBlock signed={jobv.receipt} />}
               {(state === 'released' || terminalBad) && (
                 <div className="dialog__actions">
                   <button className="btn" onClick={onClose}>
@@ -345,6 +355,66 @@ function pretty(x: unknown): string {
     return String(x);
   }
 }
+/** The signed, independently-verifiable proof that the escrow settled. */
+function ReceiptBlock({ signed }: { signed: SignedReceipt }) {
+  const toast = useToast();
+  const [state, setState] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  const r = signed.receipt;
+
+  const verify = async () => {
+    setState('checking');
+    try {
+      const { valid } = await api.verifyReceipt(signed);
+      setState(valid ? 'valid' : 'invalid');
+      toast(valid ? 'Receipt signature verified' : 'Receipt did not verify', valid ? 'ok' : 'bad');
+    } catch (e) {
+      setState('idle');
+      toast(e instanceof Error ? e.message : 'could not verify', 'bad');
+    }
+  };
+
+  return (
+    <div className="receiptbox">
+      <div className="receiptbox__h">
+        <span>⛓ settlement receipt</span>
+        <CopyBtn v={JSON.stringify(signed, null, 2)} label="copy receipt" />
+      </div>
+      <div className="receiptbox__grid">
+        <span>outcome</span>
+        <b>{r.outcome === 'release' ? 'released to provider' : 'refunded to buyer'}</b>
+        <span>amount</span>
+        <b>{r.amountUct} UCT</b>
+        <span>signed by</span>
+        <b title={signed.signer}>escrow · {signed.signer.slice(0, 10)}…</b>
+        {r.txId && (
+          <>
+            <span>on-chain tx</span>
+            <b title={r.txId}>{r.txId.slice(0, 16)}…</b>
+          </>
+        )}
+      </div>
+      <div className="receiptbox__foot">
+        <button
+          className={`btn btn--sm${state === 'valid' ? ' btn--ok' : ''}`}
+          disabled={state === 'checking'}
+          onClick={() => void verify()}
+        >
+          {state === 'checking'
+            ? 'verifying…'
+            : state === 'valid'
+              ? '✓ signature verified'
+              : state === 'invalid'
+                ? '✗ invalid'
+                : 'Verify signature'}
+        </button>
+        <span className="receiptbox__note">
+          signed by the escrow wallet — anyone can verify it offline with the Sphere SDK.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function CopyBtn({ v, label = 'copy' }: { v: string; label?: string }) {
   const toast = useToast();
   return (

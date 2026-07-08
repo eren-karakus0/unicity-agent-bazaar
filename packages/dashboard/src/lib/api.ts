@@ -113,11 +113,32 @@ export interface HireResult {
   decimals: number;
 }
 
+export interface SettlementReceipt {
+  v: 1;
+  jobId: string;
+  listingId: string;
+  escrowRef: string;
+  buyer: string;
+  provider: string;
+  amountUct: number;
+  outcome: 'release' | 'refund';
+  recipient: string;
+  txId?: string;
+  settledAt: number;
+}
+
+export interface SignedReceipt {
+  receipt: SettlementReceipt;
+  signature: string;
+  signer: string;
+}
+
 export interface JobView {
   job: EscrowJob;
   result?: ServiceResult;
   settlement?: Settlement;
   review?: Review;
+  receipt?: SignedReceipt;
 }
 
 export interface ReputationView {
@@ -285,4 +306,6 @@ export const api = {
     ),
   reviews: (principal: string) =>
     get<{ reviews: Review[] }>(`/api/reviews/${encodeURIComponent(principal)}`).then((r) => r.reviews),
+  verifyReceipt: (signed: SignedReceipt) =>
+    post<{ valid: boolean; signer: string }>('/api/receipt/verify', signed),
 };

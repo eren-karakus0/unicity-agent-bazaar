@@ -2,6 +2,7 @@ import {
   applyEscrowEvent,
   applyOutcome,
   applyRating,
+  canonicalReceipt,
   clampStars,
   earnedAchievements,
   hotScore,
@@ -21,6 +22,8 @@ import {
   type Review,
   type ServiceInvocation,
   type ServiceResult,
+  type SettlementReceipt,
+  type SignedReceipt,
 } from '@bazaar/core';
 import crypto from 'node:crypto';
 import { principalOf, type Identity } from './auth.js';
@@ -106,6 +109,7 @@ export interface BazaarSnapshot {
   inputs: [string, unknown][];
   results: [string, ServiceResult][];
   settlements: [string, Settlement][];
+  receipts: [string, SignedReceipt][];
   reputations: [string, Reputation][];
   listingProviders: [string, Identity][];
   jobParties: [string, { buyer: Identity; provider: Identity }][];
@@ -125,6 +129,10 @@ export interface BazaarAgent {
   readonly uctCoin: { coinId: string; decimals: number };
   send(recipient: string, human: string | number, memo?: string): Promise<unknown>;
   toHuman(smallest: bigint | string): string;
+  /** The escrow wallet's chain pubkey — the signer of settlement receipts. */
+  readonly chainPubkey?: string;
+  /** Sign a receipt (secp256k1). Absent → receipts are simply not minted. */
+  signMessage?(message: string): string;
 }
 
 export interface BazaarServiceOptions {
@@ -166,6 +174,8 @@ export interface JobView {
   result?: ServiceResult;
   settlement?: Settlement;
   review?: Review;
+  /** Signed, independently-verifiable proof of settlement (once settled). */
+  receipt?: SignedReceipt;
 }
 
 /**
@@ -186,6 +196,8 @@ export class BazaarService {
   private readonly results = new Map<string, ServiceResult>();
   private readonly reputations = new Map<string, Reputation>();
   private readonly settlements = new Map<string, Settlement>();
+  /** jobId -> signed settlement receipt (minted once a payout confirms). */
+  private readonly receipts = new Map<string, SignedReceipt>();
   /** listingId -> the authenticated provider who published it. */
   private readonly listingProviders = new Map<string, Identity>();
   /** jobId -> the proven identities on both sides (drives spoof-proof payout). */
@@ -559,6 +571,7 @@ export class BazaarService {
           job.providerNametag,
           applyOutcome(rep, kind === 'release' ? 'released' : 'refunded', job.amountUct),
         );
+        this.mintReceipt(job, kind, recipient, tx?.id);
         this.log.info(`${kind} settled: ${job.amountUct} UCT → ${recipient}`);
       } catch (e) {
         this.settlements.set(job.jobId, {
@@ -577,6 +590,39 @@ export class BazaarService {
     void run.finally(() => this.inFlightPayouts.delete(run));
   }
 
+  /**
+   * Sign a settlement receipt with the escrow wallet so the outcome is provable
+   * offline. No-op when the agent can't sign (e.g. in tests without a wallet).
+   */
+  private mintReceipt(job: EscrowJob, kind: SettlementKind, recipient: string, txId?: string): void {
+    const signer = this.agent.chainPubkey;
+    if (!this.agent.signMessage || !signer) return;
+    const receipt: SettlementReceipt = {
+      v: 1,
+      jobId: job.jobId,
+      listingId: job.listingId,
+      escrowRef: job.escrowRef,
+      buyer: job.buyerNametag,
+      provider: job.providerNametag,
+      amountUct: job.amountUct,
+      outcome: kind,
+      recipient,
+      ...(txId ? { txId } : {}),
+      settledAt: Date.now(),
+    };
+    try {
+      const signature = this.agent.signMessage(canonicalReceipt(receipt));
+      this.receipts.set(job.jobId, { receipt, signature, signer });
+    } catch (e) {
+      this.log.warn(`could not sign receipt for ${job.jobId}`, e instanceof Error ? e.message : e);
+    }
+  }
+
+  /** The signed settlement receipt for a job, if one has been minted. */
+  receiptFor(jobId: string): SignedReceipt | undefined {
+    return this.receipts.get(jobId);
+  }
+
   // ---- views ----
 
   getJob(jobId: string): JobView | undefined {
@@ -587,6 +633,7 @@ export class BazaarService {
       ...(this.results.has(jobId) ? { result: this.results.get(jobId) } : {}),
       ...(this.settlements.has(jobId) ? { settlement: this.settlements.get(jobId) } : {}),
       ...(this.reviews.has(jobId) ? { review: this.reviews.get(jobId) } : {}),
+      ...(this.receipts.has(jobId) ? { receipt: this.receipts.get(jobId) } : {}),
     };
   }
 
@@ -867,6 +914,7 @@ export class BazaarService {
       inputs: [...this.inputs],
       results: [...this.results],
       settlements: [...this.settlements],
+      receipts: [...this.receipts],
       reputations: [...this.reputations],
       listingProviders: [...this.listingProviders],
       jobParties: [...this.jobParties],
@@ -893,6 +941,7 @@ export class BazaarService {
     fill(this.inputs, snap.inputs);
     fill(this.results, snap.results);
     fill(this.settlements, snap.settlements);
+    fill(this.receipts, snap.receipts ?? []);
     fill(this.reputations, snap.reputations);
     fill(this.listingProviders, snap.listingProviders);
     fill(this.jobParties, snap.jobParties);

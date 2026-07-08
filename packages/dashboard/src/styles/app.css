@@ -2046,6 +2046,62 @@ button {
   white-space: nowrap;
 }
 
+/* ---- settlement receipt (on-chain proof) ---- */
+.receiptbox {
+  margin-top: 16px;
+  border: 1px solid var(--border-orange);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 111, 0, 0.06), var(--bg-raised) 90px);
+  padding: 14px 16px;
+}
+.receiptbox__h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-orange);
+  margin-bottom: 12px;
+}
+.receiptbox__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 13px;
+}
+.receiptbox__grid span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  align-self: center;
+}
+.receiptbox__grid b {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.receiptbox__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.receiptbox__note {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 160px;
+}
+.btn--ok {
+  color: var(--ok);
+  border-color: rgba(61, 220, 151, 0.45);
+  background: rgba(61, 220, 151, 0.1);
+}
+
 /* ---- accessibility: honor reduced-motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -29,9 +29,14 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   Oracle) on loopback and seeds their listings every boot, so the marketplace is
   always live + hireable and the full signed path is dogfooded on each boot.
 - **MCP server** (`@bazaar/mcp`): exposes the marketplace to any MCP client as
-  tools (discover / get / hire / pay / status / accept) backed by the agent's own
-  Sphere wallet - so an LLM or another agent can buy a service on-chain, end to
-  end. "Agents hiring agents."
+  tools (discover / get / hire / pay / status / accept / verify_receipt) backed by
+  the agent's own Sphere wallet - so an LLM or another agent can buy a service
+  on-chain, end to end. "Agents hiring agents."
+- **Signed settlement receipts** (`@bazaar/core` `canonicalReceipt`): every
+  settled job yields a receipt signed by the escrow wallet's key and carrying the
+  on-chain `txId`. Anyone can verify it offline (`verifySignedMessage`) - the UI
+  has a Verify button, the backend a `/api/receipt/verify` endpoint, and MCP a
+  `verify_receipt` tool. Settlement is provable and non-repudiable, not "trust us".
 - **Trust/UX**: endpoint-verified + wallet-verified badges, in-app delivery
   notifications (poll-based bell), dispute visibility on jobs/profiles.
 - **Ops**: file-backed state persistence, adaptive health, toasts, responsive +

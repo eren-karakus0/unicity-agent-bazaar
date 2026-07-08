@@ -1,4 +1,4 @@
-import type { InputField } from '@bazaar/core';
+import type { InputField, SignedReceipt } from '@bazaar/core';
 
 /** A listing as the marketplace API returns it (decorated with platform metadata). */
 export interface ListingLite {
@@ -38,6 +38,7 @@ export interface JobView {
   };
   result?: { ok: boolean; output?: unknown; error?: string };
   settlement?: { status: string; kind: string; amountUct: number; recipient: string; txId?: string };
+  receipt?: SignedReceipt;
 }
 
 export interface DepositInfo {

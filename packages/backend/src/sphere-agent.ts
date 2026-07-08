@@ -128,6 +128,11 @@ export class SphereAgent {
     return this.inner?.identity?.chainPubkey;
   }
 
+  /** Sign a plaintext with the wallet identity key (verifiable via verifySignedMessage). */
+  signMessage(message: string): string {
+    return this.sphere.signMessage(message);
+  }
+
   /** UCT coin id (hex) + decimals - e.g. for building wallet send-intents. */
   get uctCoin(): { coinId: string; decimals: number } {
     return { coinId: this.uctCoinId, decimals: this.uctDecimals ?? DEFAULT_UCT_DECIMALS };
