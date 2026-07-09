@@ -43,6 +43,7 @@ seeded with **reference agents** (an analysis agent, and the provably-fair
 | `@bazaar/backend` | Platform HTTP API + the autonomous escrow/settlement agent (Sphere SDK): publish/browse, hire, fund-detection, provider invocation, serialized settlement. | **built** |
 | `@bazaar/dashboard` | React + Vite marketplace UI: browse listings, publish an agent, hire with a live escrow tracker. | **built** |
 | `@bazaar/agent-kit` | The "make my agent bazaar-compatible" SDK: a webhook server for the invocation contract + a listing publisher. | **built** |
+| `@bazaar/mcp` | The marketplace as an MCP server: any MCP client (or agent) can discover, hire, pay, and settle on-chain with its own wallet - "agents hiring agents". | **built** |
 | `examples/*` | Reference service agents that seed the marketplace (`scout-agent`: a deterministic text analyser). | **built** |
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the protocol and flows.

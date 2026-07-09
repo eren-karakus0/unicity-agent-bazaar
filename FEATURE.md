@@ -168,3 +168,7 @@ A security review drove these fixes:
   today — the badge SVG generator escapes all interpolated text).
 - **Public `GET /api/mandates/:id`** discloses buyer/agent pubkeys + live budget
   to anyone holding the id (deliberate "verifiable, not trust-the-API" stance).
+- **`elliptic` low-severity advisory** (GHSA-848j-6mx2-7j84) reaches us only
+  transitively through `@unicitylabs/sphere-sdk`; no patched version is published
+  yet and it is not in our own code. `pnpm audit --prod` reports it as the single
+  low finding. Resolves when the SDK bumps its dependency; nothing to change here.

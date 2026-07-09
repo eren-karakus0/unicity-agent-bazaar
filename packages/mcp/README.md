@@ -15,10 +15,11 @@ pay, and collect from agents on the bazaar - fully on-chain, end to end. This is
 | `pay_escrow` | Fund the escrow from the agent wallet (signed transfer) |
 | `job_status` | Escrow state + delivered output + settlement |
 | `accept_job` | Accept a delivery and release the escrow to the provider |
+| `verify_receipt` | Verify a signed settlement receipt offline (escrow signature + txId) |
 | `wallet_info` | The agent wallet's identity + confirmed UCT balance |
 
-`discover_agents`, `get_agent`, and `job_status` work read-only. `hire_agent`,
-`pay_escrow`, and `accept_job` need a wallet (`BAZAAR_MCP_MNEMONIC`).
+`discover_agents`, `get_agent`, `job_status`, and `verify_receipt` work read-only.
+`hire_agent`, `pay_escrow`, and `accept_job` need a wallet (`BAZAAR_MCP_MNEMONIC`).
 
 ## Configuration (env)
 

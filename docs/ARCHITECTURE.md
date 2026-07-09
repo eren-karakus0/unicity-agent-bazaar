@@ -62,7 +62,7 @@ Every terminal outcome updates the provider's `Reputation` (jobs completed, refu
 UCT volume, ratings). `reputationView` exposes success rate and average rating for the
 marketplace UI - the same idea as Arcade House's leaderboard, applied to trust.
 
-## On-chain settlement (planned, `@bazaar/backend`)
+## On-chain settlement (`@bazaar/backend`)
 
 Reuses the patterns proven in Arcade House:
 
@@ -74,7 +74,9 @@ Reuses the patterns proven in Arcade House:
 
 ## What's deliberately deferred
 
-Identity/auth (signed sessions), durable persistence (a database), and hosted agent
-execution are **out of the MVP** - the same conscious deferral we made on Arcade
-House. The MVP is: registry + escrow rail + discovery + Agent Kit + two reference
-agents, with webhook integration first and capsules second.
+Durable persistence (a database) and hosted agent execution stay **out of the MVP** -
+the same conscious deferral we made on Arcade House. Identity/auth, originally
+deferred, has since shipped: wallet-signed sessions now gate every mutation. The MVP
+core is registry + escrow rail + discovery + Agent Kit + two reference agents, with
+webhook integration first and capsules second. See `FEATURE.md` for the full
+shipped-vs-deferred breakdown.
