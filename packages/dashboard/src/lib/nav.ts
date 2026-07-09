@@ -3,12 +3,14 @@
  * vercel.json so a deep link like /marketplace serves index.html.
  * e.g. go('/'), go('/marketplace'), go('/agent/@scout').
  */
+import { scrollToTop } from './smooth-scroll';
+
 export function go(path: string): void {
   if (path === location.pathname) return;
   history.pushState({}, '', path);
   // pushState doesn't emit popstate; nudge listeners so the app re-renders.
   window.dispatchEvent(new PopStateEvent('popstate'));
   // Only in-app navigations jump to the top; genuine back/forward keeps the
-  // browser's restored scroll position.
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // browser's restored scroll position. Routed through Lenis when active.
+  scrollToTop();
 }

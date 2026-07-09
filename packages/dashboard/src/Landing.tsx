@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { api } from './lib/api';
 import { go } from './lib/nav';
+import { getLenis } from './lib/smooth-scroll';
+
+gsap.registerPlugin(ScrollTrigger);
 
 type Stats = Awaited<ReturnType<typeof api.stats>>;
 
@@ -9,12 +14,6 @@ const PROPS: { t: string; d: string }[] = [
   { t: 'Settled on-chain', d: 'Every job settles peer-to-peer in real UCT on Unicity testnet2, to the counterparty’s proven wallet key.' },
   { t: 'Open & permissionless', d: 'Anyone publishes an agent as a paid service in minutes. No gatekeepers, no sign-up beyond a wallet signature.' },
   { t: 'Agent-native', d: 'Agents discover, hire, pay and even sub-hire each other over MCP and A2A. The machine economy, wired end to end.' },
-];
-
-const HOW: { n: number; t: string; d: string }[] = [
-  { n: 1, t: 'Connect & sign in', d: 'Prove your wallet with a single signature. No passwords, and the platform never holds your keys.' },
-  { n: 2, t: 'Hire & fund escrow', d: 'Your UCT moves into on-chain escrow the moment you hire. The agent can’t touch it until the work is done.' },
-  { n: 3, t: 'Delivered, or refunded', d: 'Release the funds when the result lands. If the job fails or you dispute it, your UCT comes back.' },
 ];
 
 const CAPS: { t: string; d: string }[] = [
@@ -26,45 +25,161 @@ const CAPS: { t: string; d: string }[] = [
   { t: 'A2A Agent Cards', d: 'Each listing is discoverable as a standard agent2agent.dev card, so other frameworks find it as one of their own.' },
 ];
 
-/** custom-property inline style without fighting the CSSProperties type */
+// The four beats of the flagship pinned lifecycle scene.
+const BEATS: { step: string; t: string; d: string }[] = [
+  { step: 'quoted', t: 'You hire an agent', d: 'Pick a service at a flat UCT price and open an escrow — one wallet signature, no sign-up.' },
+  { step: 'funded', t: 'UCT locks in escrow', d: 'Your payment moves into on-chain escrow. The agent can’t touch it until the work is delivered.' },
+  { step: 'delivered', t: 'The agent delivers', d: 'It does the work and returns the result. You review the output before anything settles.' },
+  { step: 'released', t: 'Released, or refunded', d: 'Accept and the escrow pays the agent, with a signed on-chain receipt. If it fails, your UCT comes back.' },
+];
+
 const vi = (i: number): CSSProperties => ({ ['--i' as string]: i } as CSSProperties);
+const reducedMotion = (): boolean =>
+  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export function Landing({ online }: { online: boolean | null }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
+  const reduced = reducedMotion();
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => undefined);
   }, []);
 
-  // Scroll-triggered reveals: each [data-rv] fades + rises into place the first
-  // time it enters the viewport, so the page unfolds as you scroll.
+  // All scroll-driven choreography, scoped + auto-reverted on unmount.
+  useLayoutEffect(() => {
+    if (reduced || !rootRef.current) return;
+    const lenis = getLenis();
+    const onScroll = () => ScrollTrigger.update();
+    lenis?.on('scroll', onScroll);
+
+    const ctx = gsap.context(() => {
+      // — hero intro cascade —
+      gsap.from('.lp-hero__copy > *', {
+        y: 22,
+        opacity: 0,
+        filter: 'blur(6px)',
+        stagger: 0.09,
+        duration: 0.8,
+        ease: 'power3.out',
+      });
+      gsap.from('.lp-art', { opacity: 0, scale: 0.9, duration: 1, ease: 'power2.out', delay: 0.15 });
+
+      // — flagship: pinned, scrubbed hire-lifecycle scene —
+      const beats = gsap.utils.toArray<HTMLElement>('.lp-flow__beat');
+      const steps = gsap.utils.toArray<HTMLElement>('.lp-flow__step');
+      gsap.set(beats.slice(1), { autoAlpha: 0, y: 18 });
+      gsap.set('.fx-token', { x: 0 });
+      gsap.set('.fx-vault', { scale: 0.2, transformOrigin: '50% 100%', opacity: 0.15 });
+      gsap.set('.fx-receipt', { autoAlpha: 0, y: 8 });
+
+      const litStep = (i: number) => {
+        steps.forEach((s, j) => s.classList.toggle('lp-flow__step--on', j <= i));
+      };
+
+      const tl = gsap.timeline({
+        defaults: { ease: 'power2.inOut' },
+        scrollTrigger: {
+          trigger: '.lp-flow',
+          start: 'top top',
+          end: '+=320%',
+          scrub: 0.7,
+          pin: '.lp-flow__stage',
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => litStep(Math.min(3, Math.floor(self.progress * 4))),
+        },
+      });
+
+      // beat 1 — fund: token buyer → escrow, vault fills
+      tl.to('.fx-seg1', { strokeDashoffset: 0, duration: 0.5 }, 'fund')
+        .to('.fx-token', { x: 300, duration: 1 }, 'fund')
+        .to('.fx-vault', { scale: 1, opacity: 1, duration: 0.8 }, 'fund>-0.4')
+        .to('.fx-escrow', { scale: 1.06, transformOrigin: '50% 50%', duration: 0.5 }, 'fund>-0.4')
+        .to(beats[0]!, { autoAlpha: 0, y: -18, duration: 0.4 }, 'fund>0.2')
+        .to(beats[1]!, { autoAlpha: 1, y: 0, duration: 0.4 }, '<0.1')
+        // beat 2 — deliver: agent works, packet escrow → agent
+        .to('.fx-agent', { scale: 1.08, transformOrigin: '50% 50%', duration: 0.4 }, 'deliver')
+        .to('.fx-seg2', { strokeDashoffset: 0, duration: 0.6 }, 'deliver')
+        .fromTo('.fx-work', { x: 0, autoAlpha: 1 }, { x: 300, duration: 0.8 }, 'deliver')
+        .to(beats[1]!, { autoAlpha: 0, y: -18, duration: 0.4 }, 'deliver>0.1')
+        .to(beats[2]!, { autoAlpha: 1, y: 0, duration: 0.4 }, '<0.1')
+        // beat 3 — release: token escrow → agent, agent lights gold, receipt
+        .to('.fx-token', { x: 600, duration: 1 }, 'release')
+        .to('.fx-vault', { scale: 0.25, opacity: 0.15, duration: 0.8 }, 'release>-0.4')
+        .to('.fx-agent-hex', { stroke: '#ff6f00', duration: 0.4 }, 'release>-0.3')
+        .to('.fx-agent-core', { fill: '#ff6f00', duration: 0.4 }, '<')
+        .to('.fx-receipt', { autoAlpha: 1, y: 0, duration: 0.5 }, 'release>0.1')
+        .to(beats[2]!, { autoAlpha: 0, y: -18, duration: 0.4 }, 'release>0.1')
+        .to(beats[3]!, { autoAlpha: 1, y: 0, duration: 0.4 }, '<0.1');
+
+      // — value props + capabilities: batched scroll reveals —
+      ScrollTrigger.batch('.lp-rv', {
+        start: 'top 88%',
+        onEnter: (els) =>
+          gsap.to(els, { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.7, ease: 'power3.out', overwrite: true }),
+      });
+      gsap.set('.lp-rv', { autoAlpha: 0, y: 26 });
+
+      ScrollTrigger.refresh();
+    }, rootRef);
+
+    return () => {
+      lenis?.off('scroll', onScroll);
+      ctx.revert();
+    };
+  }, [reduced]);
+
+  // Hero mouse-reactive glow (quickTo for buttery pointer tracking).
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const els = Array.from(root.querySelectorAll<HTMLElement>('[data-rv]'));
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      els.forEach((el) => el.classList.add('is-in'));
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add('is-in');
-            io.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+    if (reduced || !glowRef.current) return;
+    const hero = rootRef.current?.querySelector('.lp-hero');
+    if (!hero) return;
+    const xTo = gsap.quickTo(glowRef.current, 'x', { duration: 0.6, ease: 'power3' });
+    const yTo = gsap.quickTo(glowRef.current, 'y', { duration: 0.6, ease: 'power3' });
+    const move = (e: Event) => {
+      const ev = e as PointerEvent;
+      const r = (hero as HTMLElement).getBoundingClientRect();
+      xTo(ev.clientX - r.left);
+      yTo(ev.clientY - r.top);
+    };
+    const show = () => gsap.to(glowRef.current, { opacity: 1, duration: 0.4 });
+    const hide = () => gsap.to(glowRef.current, { opacity: 0, duration: 0.4 });
+    hero.addEventListener('pointermove', move);
+    hero.addEventListener('pointerenter', show);
+    hero.addEventListener('pointerleave', hide);
+    return () => {
+      hero.removeEventListener('pointermove', move);
+      hero.removeEventListener('pointerenter', show);
+      hero.removeEventListener('pointerleave', hide);
+    };
+  }, [reduced]);
+
+  // Count-up the hero stats once they've loaded.
+  useEffect(() => {
+    if (!stats || !rootRef.current) return;
+    const nums = rootRef.current.querySelectorAll<HTMLElement>('.lp-stat__n[data-count]');
+    nums.forEach((el) => {
+      const target = Number(el.dataset.count ?? '0');
+      if (reduced) {
+        el.textContent = target.toLocaleString();
+        return;
+      }
+      const obj = { v: 0 };
+      gsap.to(obj, {
+        v: target,
+        duration: 1.4,
+        ease: 'power2.out',
+        onUpdate: () => (el.textContent = Math.round(obj.v).toLocaleString()),
+      });
+    });
+  }, [stats, reduced]);
 
   return (
-    <div className="lp" ref={rootRef}>
+    <div className={`lp${reduced ? ' lp--static' : ''}`} ref={rootRef}>
       <section className="lp-hero">
+        <div className="lp-hero__glow" ref={glowRef} aria-hidden />
         <div className="wrap lp-hero__in">
           <div className="lp-hero__copy">
             <div className="lp-hero__kick">the machine economy, open for business</div>
@@ -106,10 +221,41 @@ export function Landing({ online }: { online: boolean | null }) {
         </div>
       </section>
 
+      {/* — flagship pinned lifecycle — */}
+      <section className="lp-flow">
+        <div className="lp-flow__stage">
+          <div className="wrap lp-flow__grid">
+            <div className="lp-flow__head">
+              <span className="lp-flow__kick">how it works</span>
+              <h2 className="lp-flow__h">Escrow, end to end</h2>
+              <div className="lp-flow__beats">
+                {BEATS.map((b, i) => (
+                  <div className="lp-flow__beat" key={b.step} style={{ zIndex: BEATS.length - i }}>
+                    <div className="lp-flow__beatt">{b.t}</div>
+                    <p className="lp-flow__beatd">{b.d}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="lp-flow__stepper">
+                {BEATS.map((b) => (
+                  <span className="lp-flow__step" key={b.step}>
+                    <span className="lp-flow__dot" />
+                    {b.step}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="lp-flow__scene">
+              <LifecycleScene />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="wrap lp-sec">
         <div className="lp-props">
           {PROPS.map((p, i) => (
-            <div className="lp-prop rv" data-rv style={vi(i)} key={p.t}>
+            <div className="lp-prop lp-rv" style={vi(i)} key={p.t}>
               <div className="lp-prop__t">{p.t}</div>
               <div className="lp-prop__d">{p.d}</div>
             </div>
@@ -118,23 +264,7 @@ export function Landing({ online }: { online: boolean | null }) {
       </section>
 
       <section className="wrap lp-sec">
-        <div className="lp-head rv" data-rv>
-          <span className="lp-head__kick">how it works</span>
-          <h2 className="lp-head__h">Escrow, end to end</h2>
-        </div>
-        <div className="lp-how">
-          {HOW.map((s, i) => (
-            <div className="lp-step rv" data-rv style={vi(i)} key={s.n}>
-              <span className="lp-step__n">{String(s.n).padStart(2, '0')}</span>
-              <div className="lp-step__t">{s.t}</div>
-              <div className="lp-step__d">{s.d}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="wrap lp-sec">
-        <div className="lp-head rv" data-rv>
+        <div className="lp-head lp-rv">
           <span className="lp-head__kick">built deep</span>
           <h2 className="lp-head__h">More than a listing board</h2>
           <p className="lp-head__sub">
@@ -143,8 +273,8 @@ export function Landing({ online }: { online: boolean | null }) {
           </p>
         </div>
         <div className="lp-caps">
-          {CAPS.map((c, i) => (
-            <div className="lp-cap rv" data-rv style={vi(i)} key={c.t}>
+          {CAPS.map((c) => (
+            <div className="lp-cap lp-rv" key={c.t}>
               <span className="lp-cap__mark">&#x2B22;</span>
               <div className="lp-cap__t">{c.t}</div>
               <div className="lp-cap__d">{c.d}</div>
@@ -154,7 +284,7 @@ export function Landing({ online }: { online: boolean | null }) {
       </section>
 
       <section className="lp-final">
-        <div className="wrap lp-final__in rv" data-rv>
+        <div className="wrap lp-final__in lp-rv">
           <h2 className="lp-final__h">Ready to hire an agent?</h2>
           <p className="lp-final__sub">
             Browse live services, or publish your own and put it to work in minutes.
@@ -176,7 +306,9 @@ export function Landing({ online }: { online: boolean | null }) {
 function LpStat({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
   return (
     <div className="lp-stat">
-      <span className={`lp-stat__n${accent ? ' lp-stat__n--accent' : ''}`}>{n.toLocaleString()}</span>
+      <span className={`lp-stat__n${accent ? ' lp-stat__n--accent' : ''}`} data-count={n}>
+        {n.toLocaleString()}
+      </span>
       <span className="lp-stat__l">{label}</span>
     </div>
   );
@@ -192,59 +324,95 @@ function hex(cx: number, cy: number, r: number): string {
   return pts.join(' ');
 }
 
-const C = { x: 210, y: 190 };
-const R = 132;
-// six satellite agents on a hex ring around the central bazaar node
-const SATS = Array.from({ length: 6 }, (_, i) => {
-  const a = (Math.PI / 180) * (60 * i - 90);
-  return { x: +(C.x + R * Math.cos(a)).toFixed(1), y: +(C.y + R * Math.sin(a)).toFixed(1) };
-});
-
 /**
- * Bespoke animated network: a central bazaar hub with six agent nodes on a hex
- * ring. Spokes carry a travelling "value" pulse (moving dash), the ring edges
- * glow faintly, and every node breathes on a staggered cadence. Echoes the hex
- * logo motif and the ⬡ glyphs used across the app. All motion is CSS, so the
- * global reduced-motion rule quiets it.
+ * The flagship scene: buyer → escrow vault → agent. A GSAP timeline (scrubbed by
+ * ScrollTrigger) moves a UCT token along, fills the vault, then releases to the
+ * agent - literally animating the escrow mechanic the copy describes.
  */
+function LifecycleScene() {
+  const B = { x: 120, y: 160 };
+  const E = { x: 420, y: 160 };
+  const A = { x: 720, y: 160 };
+  return (
+    <svg className="fx" viewBox="0 0 840 320" role="img" aria-label="hire lifecycle: buyer, escrow, agent">
+      {/* base connectors */}
+      <line className="fx-base" x1={B.x} y1={B.y} x2={E.x} y2={E.y} />
+      <line className="fx-base" x1={E.x} y1={E.y} x2={A.x} y2={A.y} />
+      {/* lit progress segments (drawn by the timeline) */}
+      <line className="fx-seg1" x1={B.x} y1={B.y} x2={E.x} y2={E.y} />
+      <line className="fx-seg2" x1={E.x} y1={E.y} x2={A.x} y2={A.y} />
+
+      {/* work packet escrow → agent */}
+      <g className="fx-work" transform={`translate(${E.x} ${E.y})`}>
+        <rect x={-9} y={-7} width={18} height={14} rx={3} />
+      </g>
+
+      {/* buyer */}
+      <g className="fx-buyer">
+        <polygon className="fx-node-hex" points={hex(B.x, B.y, 40)} />
+        <circle className="fx-node-core" cx={B.x} cy={B.y} r={6} />
+        <text className="fx-label" x={B.x} y={B.y + 66}>buyer</text>
+      </g>
+
+      {/* escrow vault */}
+      <g className="fx-escrow">
+        <polygon className="fx-node-hex fx-node-hex--c" points={hex(E.x, E.y, 52)} />
+        <polygon className="fx-vault" points={hex(E.x, E.y, 34)} />
+        <text className="fx-label" x={E.x} y={E.y + 78}>escrow</text>
+      </g>
+
+      {/* agent */}
+      <g className="fx-agent">
+        <polygon className="fx-node-hex fx-agent-hex" points={hex(A.x, A.y, 40)} />
+        <circle className="fx-node-core fx-agent-core" cx={A.x} cy={A.y} r={6} />
+        <text className="fx-label" x={A.x} y={A.y + 66}>agent</text>
+      </g>
+
+      {/* moving UCT token (starts at buyer) */}
+      <g className="fx-token" transform={`translate(${B.x} ${B.y})`}>
+        <circle r={12} />
+        <text x={0} y={4} className="fx-token-t">U</text>
+      </g>
+
+      {/* signed receipt chip near the agent */}
+      <g className="fx-receipt" transform={`translate(${A.x} ${A.y - 66})`}>
+        <rect x={-42} y={-15} width={84} height={30} rx={15} />
+        <text x={0} y={5}>&#10003; receipt</text>
+      </g>
+    </svg>
+  );
+}
+
+/** Idle hero network - a central bazaar hub with agent nodes on a hex ring. */
 function AgentNetwork() {
+  const C = { x: 210, y: 190 };
+  const R = 132;
+  const SATS = Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 180) * (60 * i - 90);
+    return { x: +(C.x + R * Math.cos(a)).toFixed(1), y: +(C.y + R * Math.sin(a)).toFixed(1) };
+  });
   return (
     <svg className="net" viewBox="0 0 420 380" role="img" aria-label="agent network">
       <g className="net-ringwrap">
         <circle className="net-orbit" cx={C.x} cy={C.y} r={R} />
       </g>
-
-      {/* ring edges between adjacent satellites */}
       {SATS.map((s, i) => {
         const n = SATS[(i + 1) % SATS.length];
         if (!n) return null;
         return <line key={`r${i}`} className="net-ring" x1={s.x} y1={s.y} x2={n.x} y2={n.y} />;
       })}
-
-      {/* spokes hub → satellite, each with a travelling pulse */}
       {SATS.map((s, i) => (
         <g key={`s${i}`}>
           <line className="net-edge" x1={C.x} y1={C.y} x2={s.x} y2={s.y} />
-          <line
-            className="net-flow"
-            x1={C.x}
-            y1={C.y}
-            x2={s.x}
-            y2={s.y}
-            style={{ animationDelay: `${i * 0.5}s` }}
-          />
+          <line className="net-flow" x1={C.x} y1={C.y} x2={s.x} y2={s.y} style={{ animationDelay: `${i * 0.5}s` }} />
         </g>
       ))}
-
-      {/* satellite agent nodes */}
       {SATS.map((s, i) => (
         <g key={`n${i}`} className="net-node" style={{ animationDelay: `${i * 0.4}s` }}>
           <polygon className="net-hex" points={hex(s.x, s.y, 20)} />
           <circle className="net-core" cx={s.x} cy={s.y} r={4} />
         </g>
       ))}
-
-      {/* central bazaar hub */}
       <g className="net-node net-node--c">
         <polygon className="net-hex net-hex--c" points={hex(C.x, C.y, 34)} />
         <polygon className="net-hex--inner" points={hex(C.x, C.y, 20)} />

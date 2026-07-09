@@ -79,6 +79,28 @@ button {
   padding: 0 24px;
 }
 
+/* ---- Lenis smooth scroll ---- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+/* placeholder while the lazy landing chunk loads - avoids a layout jump */
+.lp-boot {
+  min-height: 100vh;
+}
+
 /* ---- header ---- */
 .hdr {
   position: sticky;
@@ -3226,31 +3248,30 @@ button {
   position: relative;
   z-index: 2;
 }
-.lp-hero__copy > * {
-  animation: heroReveal 0.7s both cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.lp-hero__copy > *:nth-child(1) {
-  animation-delay: 0.02s;
-}
-.lp-hero__copy > *:nth-child(2) {
-  animation-delay: 0.1s;
-}
-.lp-hero__copy > *:nth-child(3) {
-  animation-delay: 0.18s;
-}
-.lp-hero__copy > *:nth-child(4) {
-  animation-delay: 0.26s;
-}
-.lp-hero__copy > *:nth-child(5) {
-  animation-delay: 0.34s;
-}
+/* hero intro cascade + art reveal are driven by GSAP under motion; static otherwise */
 
 /* hero art: animated agent-network graph */
 .lp-art {
   position: relative;
+  z-index: 2;
   display: flex;
   justify-content: center;
-  animation: artIn 1s 0.15s both cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* mouse-reactive glow (position driven by GSAP quickTo) */
+.lp-hero__glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 111, 0, 0.16), transparent 70%);
+  filter: blur(24px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
 }
 @keyframes artIn {
   from {
@@ -3869,17 +3890,6 @@ button {
       animation-timeline: view();
       animation-range: entry 0% entry 48%;
     }
-
-    /* landing feature cards get a gentle continuous parallax as you scroll -
-       uses `translate` so it composes with the .rv reveal's `transform`. */
-    .lp-prop,
-    .lp-step,
-    .lp-cap,
-    .lp-final__in {
-      animation: lpDrift linear both;
-      animation-timeline: view();
-      animation-range: cover;
-    }
   }
 }
 
@@ -3892,5 +3902,220 @@ button {
     animation-delay: 0 !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* ============================================================================
+   Landing — flagship pinned "hire lifecycle" scene (GSAP-driven)
+   ============================================================================ */
+.lp-flow {
+  position: relative;
+  background:
+    radial-gradient(900px 500px at 50% 0%, rgba(255, 111, 0, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--bg-root), var(--bg-surface) 45%, var(--bg-root));
+}
+.lp-flow__stage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 48px 0;
+}
+.lp-flow__grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 44px;
+  align-items: center;
+  width: 100%;
+}
+.lp-flow__kick {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brand-orange);
+}
+.lp-flow__h {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 4.4vw, 52px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+}
+.lp-flow__beats {
+  position: relative;
+  min-height: 168px;
+  margin: 24px 0 26px;
+}
+.lp-flow__beat {
+  position: absolute;
+  inset: 0;
+}
+.lp-flow__beatt {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--brand-orange);
+}
+.lp-flow__beatd {
+  margin: 10px 0 0;
+  max-width: 460px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.lp-flow__stepper {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lp-flow__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 0.3s ease;
+}
+.lp-flow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.lp-flow__step--on {
+  color: var(--text-primary);
+}
+.lp-flow__step--on .lp-flow__dot {
+  background: var(--brand-orange);
+  box-shadow: 0 0 10px rgba(255, 111, 0, 0.75);
+}
+.lp-flow__scene {
+  display: flex;
+  justify-content: center;
+}
+
+/* the SVG lifecycle scene */
+.fx {
+  width: 100%;
+  max-width: 660px;
+  height: auto;
+  overflow: visible;
+}
+.fx-base {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 2;
+}
+.fx-seg1,
+.fx-seg2 {
+  fill: none;
+  stroke: var(--brand-orange);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  filter: drop-shadow(0 0 4px rgba(255, 111, 0, 0.55));
+}
+.fx-node-hex {
+  fill: var(--bg-raised);
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+.fx-node-hex--c {
+  stroke: var(--brand-orange);
+  filter: drop-shadow(0 0 16px rgba(255, 111, 0, 0.35));
+}
+.fx-node-core {
+  fill: var(--text-secondary);
+}
+.fx-vault {
+  fill: rgba(255, 111, 0, 0.55);
+  stroke: none;
+}
+.fx-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-anchor: middle;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.fx-token {
+  filter: drop-shadow(0 0 8px rgba(255, 111, 0, 0.6));
+}
+.fx-token circle {
+  fill: var(--orange-lift);
+}
+.fx-token-t {
+  fill: #060606;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-anchor: middle;
+}
+.fx-work rect {
+  fill: #6ea8ff;
+  filter: drop-shadow(0 0 5px rgba(110, 168, 255, 0.6));
+}
+.fx-receipt rect {
+  fill: rgba(61, 220, 151, 0.12);
+  stroke: rgba(61, 220, 151, 0.5);
+}
+.fx-receipt text {
+  fill: var(--ok);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+/* reduced-motion / no-JS static fallback: a readable diagram + a plain list */
+.lp--static .lp-flow__stage {
+  min-height: 0;
+  padding: 64px 0;
+}
+.lp--static .lp-flow__beats {
+  position: static;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.lp--static .lp-flow__beat {
+  position: static;
+}
+.lp--static .lp-flow__step {
+  color: var(--text-primary);
+}
+.lp--static .lp-flow__step .lp-flow__dot {
+  background: var(--brand-orange);
+}
+.lp--static .fx-seg1,
+.lp--static .fx-seg2 {
+  stroke-dashoffset: 0;
+}
+
+@media (max-width: 900px) {
+  .lp-flow__grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .lp-flow__scene {
+    order: -1;
+  }
+  .lp-flow__beats {
+    min-height: 150px;
+  }
+}
+@media (max-width: 560px) {
+  .lp-hero__glow {
+    display: none;
   }
 }

@@ -12,6 +12,7 @@ import {
 } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useToast } from './lib/toast';
+import { lockScroll, unlockScroll } from './lib/smooth-scroll';
 import { buildInput, firstMissingRequired, initialValues, type FieldValues } from './lib/schema';
 
 const STEPS: { key: EscrowState; label: string }[] = [
@@ -56,9 +57,11 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
     window.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    lockScroll(); // freeze Lenis momentum too
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
+      unlockScroll();
     };
   }, [onClose]);
 

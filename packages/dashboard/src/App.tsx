@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { api } from './lib/api';
 import { useAuth, displayName } from './lib/auth';
 import { useNotifications } from './lib/notifications';
 import { go } from './lib/nav';
+import { initSmoothScroll } from './lib/smooth-scroll';
 import { LogoMark } from './Logo';
-import { Landing } from './Landing';
+// The landing carries the heavy motion stack (GSAP) - lazy-load it so the
+// marketplace and other tool pages stay lean.
+const Landing = lazy(() => import('./Landing').then((m) => ({ default: m.Landing })));
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 import { Profile } from './Profile';
@@ -54,6 +57,9 @@ export function App() {
     window.addEventListener('popstate', onNav);
     return () => window.removeEventListener('popstate', onNav);
   }, []);
+
+  // Momentum smooth-scroll for the whole app (respects reduced-motion).
+  useEffect(() => initSmoothScroll(), []);
 
   // Header condenses + gains a shadow once the page scrolls past the hero edge.
   useEffect(() => {
@@ -149,7 +155,11 @@ export function App() {
           className="page"
           key={route.name === 'profile' ? `profile:${route.principal ?? 'me'}` : route.name}
         >
-          {route.name === 'landing' && <Landing online={online} />}
+          {route.name === 'landing' && (
+            <Suspense fallback={<div className="lp-boot" aria-hidden />}>
+              <Landing online={online} />
+            </Suspense>
+          )}
           {route.name === 'market' && <Marketplace online={online} />}
           {route.name === 'publish' && <Publish />}
           {route.name === 'docs' && <Docs />}
