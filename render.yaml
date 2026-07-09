@@ -1,0 +1,36 @@
+# Render Blueprint for the Unicity Agent Bazaar backend (testnet2, free tier).
+# In Render: New + > Blueprint > pick this repo. Then set the two secrets marked
+# `sync: false` in the dashboard before the first deploy finishes.
+services:
+  - type: web
+    name: unicity-agent-bazaar-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    # --prod=false keeps devDependencies (the backend runs via `tsx`, a devDep).
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false
+    startCommand: pnpm --filter @bazaar/backend start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
+      - key: SPHERE_NETWORK
+        value: testnet2
+      - key: BAZAAR_MARKET
+        value: "1"
+      - key: BAZAAR_ESCROW_NAMETAG
+        value: bazaar-escrow-knkchn
+      # Auto-generated once and kept stable, so sessions survive restarts.
+      - key: BAZAAR_SESSION_SECRET
+        generateValue: true
+      # SECRET - paste the escrow wallet seed in the Render dashboard (never in git).
+      # Use the same words as your local data/escrow/mnemonic.txt so the wallet,
+      # its @nametag and its testnet funds carry over.
+      - key: BAZAAR_ESCROW_MNEMONIC
+        sync: false
+      # OPTIONAL - set to your Vercel frontend URL after step B so the "hire on
+      # the bazaar" link woven into posted market intents points back at the app.
+      - key: BAZAAR_PUBLIC_URL
+        sync: false
