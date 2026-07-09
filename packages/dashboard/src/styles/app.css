@@ -114,6 +114,8 @@ button {
   background: none;
   border: 0;
   padding: 0;
+  color: var(--text-primary);
+  cursor: pointer;
   cursor: pointer;
 }
 .brand__mark {
@@ -148,6 +150,7 @@ button {
   font-size: 21px;
   letter-spacing: 0.06em;
   line-height: 1;
+  color: var(--text-primary);
 }
 .brand__name em {
   color: var(--brand-orange);
@@ -3157,24 +3160,190 @@ button {
 }
 .lp-hero__in {
   position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 32px;
 }
-.lp-hero__in > * {
+.lp-hero__copy {
+  position: relative;
+  z-index: 2;
+}
+.lp-hero__copy > * {
   animation: heroReveal 0.7s both cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.lp-hero__in > *:nth-child(1) {
+.lp-hero__copy > *:nth-child(1) {
   animation-delay: 0.02s;
 }
-.lp-hero__in > *:nth-child(2) {
+.lp-hero__copy > *:nth-child(2) {
   animation-delay: 0.1s;
 }
-.lp-hero__in > *:nth-child(3) {
+.lp-hero__copy > *:nth-child(3) {
   animation-delay: 0.18s;
 }
-.lp-hero__in > *:nth-child(4) {
+.lp-hero__copy > *:nth-child(4) {
   animation-delay: 0.26s;
 }
-.lp-hero__in > *:nth-child(5) {
+.lp-hero__copy > *:nth-child(5) {
   animation-delay: 0.34s;
+}
+
+/* hero art: animated agent-network graph */
+.lp-art {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  animation: artIn 1s 0.15s both cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes artIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.net {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  overflow: visible;
+  animation: netFloat 9s ease-in-out infinite alternate;
+}
+@keyframes netFloat {
+  from {
+    transform: translateY(-7px);
+  }
+  to {
+    transform: translateY(9px);
+  }
+}
+.net-orbit {
+  fill: none;
+  stroke: rgba(255, 111, 0, 0.16);
+  stroke-width: 1;
+  stroke-dasharray: 2 8;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbitSpin 64s linear infinite;
+}
+@keyframes orbitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.net-ring {
+  stroke: rgba(255, 111, 0, 0.12);
+  stroke-width: 1.2;
+}
+.net-edge {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1.4;
+}
+.net-flow {
+  stroke: var(--brand-orange);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 5 127;
+  filter: drop-shadow(0 0 4px rgba(255, 111, 0, 0.75));
+  animation: netFlow 2.6s linear infinite;
+}
+@keyframes netFlow {
+  from {
+    stroke-dashoffset: 132;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.net-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nodePulse 3.4s ease-in-out infinite;
+}
+.net-node--c {
+  animation-duration: 4.6s;
+}
+@keyframes nodePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.09);
+  }
+}
+.net-hex {
+  fill: var(--bg-raised);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+.net-hex--c {
+  fill: rgba(255, 111, 0, 0.1);
+  stroke: var(--brand-orange);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 14px rgba(255, 111, 0, 0.4));
+}
+.net-hex--inner {
+  fill: none;
+  stroke: rgba(255, 111, 0, 0.35);
+  stroke-width: 1;
+}
+.net-core {
+  fill: var(--orange-lift);
+}
+.net-core--c {
+  fill: var(--brand-orange);
+}
+
+/* scroll cue at the base of the hero */
+.lp-scrollcue {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  animation: cueFade 2.8s ease-in-out infinite;
+}
+.lp-scrollcue__line {
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(var(--brand-orange), transparent);
+}
+@keyframes cueFade {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translate(-50%, -3px);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, 3px);
+  }
+}
+
+/* scroll-triggered reveal for below-the-fold blocks */
+.rv {
+  opacity: 0;
+  transform: translateY(24px);
+  filter: blur(6px);
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 0.7s ease;
+  transition-delay: calc(var(--i, 0) * 70ms);
+  will-change: opacity, transform;
+}
+.rv.is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
 }
 .lp-hero__kick {
   font-family: var(--font-mono);
@@ -3187,8 +3356,8 @@ button {
 .lp-hero__h {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(44px, 8vw, 92px);
-  line-height: 0.92;
+  font-size: clamp(42px, 6.4vw, 78px);
+  line-height: 0.94;
   letter-spacing: 0.01em;
   margin: 0;
   text-transform: uppercase;
@@ -3424,6 +3593,15 @@ button {
 }
 
 @media (max-width: 900px) {
+  .lp-hero__in {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .lp-art {
+    max-width: 340px;
+    margin: 10px auto 0;
+    order: 2;
+  }
   .lp-props,
   .lp-caps {
     grid-template-columns: repeat(2, 1fr);
@@ -3442,6 +3620,14 @@ button {
   }
   .lp-stats {
     gap: 26px;
+  }
+}
+@media (max-width: 560px) {
+  .lp-art {
+    display: none;
+  }
+  .lp-scrollcue {
+    display: none;
   }
 }
 
