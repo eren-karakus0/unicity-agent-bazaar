@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   api,
   type EscrowState,
@@ -125,7 +126,11 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
   const terminalBad = state === 'refunded' || state === 'cancelled';
   const act = (fn: Promise<unknown>) => fn.catch((e) => setErr(e instanceof Error ? e.message : 'action failed'));
 
-  return (
+  // Portal to <body> so the fixed-position backdrop escapes any ancestor with a
+  // transform (the scroll-driven `viewRise` on .sec/.panel establishes a
+  // containing block that would otherwise trap position:fixed and push the
+  // dialog to the bottom of the section).
+  return createPortal(
     <div className="scrim" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog__hd">
@@ -316,7 +321,8 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
