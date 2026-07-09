@@ -3786,6 +3786,103 @@ button {
   }
 }
 
+/* ============================================================================
+   Scroll-driven motion (progressive enhancement)
+   Global progress bar, landing-card parallax, a scroll-entrance for cards and
+   sections across every page, and a couple of micro-interactions. All gated on
+   `prefers-reduced-motion: no-preference` and @supports, so it's purely additive
+   and degrades to static in browsers without scroll timelines.
+   ============================================================================ */
+
+/* thin progress bar pinned above the header */
+.scrollprog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--brand-orange), var(--orange-lift));
+  z-index: 60;
+  pointer-events: none;
+}
+
+@keyframes viewRise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+@keyframes lpDrift {
+  from {
+    translate: 0 20px;
+  }
+  to {
+    translate: 0 -20px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* micro-interaction: the notifications bell haloes softly while unread */
+  .bell__btn--alert {
+    animation: bellPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes bellPulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(255, 111, 0, 0);
+    }
+    50% {
+      box-shadow: 0 0 0 4px rgba(255, 111, 0, 0.14);
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .scrollprog {
+      animation: scrollprog linear both;
+      animation-timeline: scroll(root);
+    }
+    @keyframes scrollprog {
+      to {
+        transform: scaleX(1);
+      }
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    /* cards + content blocks fade and rise as they scroll into view, on every
+       page. Replaces the one-shot mount animation where one existed. */
+    .card,
+    .sec,
+    .docs__sec,
+    .panel,
+    .testbox,
+    .secretbox,
+    .publish-ok,
+    .mand,
+    .dele-form,
+    .prof,
+    .embed,
+    .rev {
+      animation: viewRise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 48%;
+    }
+
+    /* landing feature cards get a gentle continuous parallax as you scroll -
+       uses `translate` so it composes with the .rv reveal's `transform`. */
+    .lp-prop,
+    .lp-step,
+    .lp-cap,
+    .lp-final__in {
+      animation: lpDrift linear both;
+      animation-timeline: view();
+      animation-range: cover;
+    }
+  }
+}
+
 /* ---- accessibility: honor reduced-motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *,

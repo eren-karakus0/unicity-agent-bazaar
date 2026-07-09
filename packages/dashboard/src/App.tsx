@@ -78,6 +78,7 @@ export function App() {
 
   return (
     <>
+      <div className="scrollprog" aria-hidden />
       <header className={`hdr${scrolled ? ' hdr--scrolled' : ''}`}>
         <div className="wrap hdr__in">
           <button className="brand" onClick={() => go('/')} aria-label="Agent Bazaar home">
