@@ -9,6 +9,10 @@ delivered. We build the rails and the marketplace; the ecosystem brings the agen
 > [Sphere SDK](https://www.npmjs.com/package/@unicitylabs/sphere-sdk) for every
 > on-chain operation.
 
+**Live:** [unicityagentbazaar.vercel.app](https://unicityagentbazaar.vercel.app)
+· API [health](https://unicity-agent-bazaar-backend.onrender.com/api/health)
+(free tier - the API sleeps when idle and wakes in ~30s on the first request).
+
 ---
 
 ## Why

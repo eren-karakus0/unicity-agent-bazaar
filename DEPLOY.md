@@ -1,5 +1,16 @@
 # Deploying the Unicity Agent Bazaar
 
+**Live now:**
+- Frontend (Vercel): https://unicityagentbazaar.vercel.app
+- Backend (Render): https://unicity-agent-bazaar-backend.onrender.com
+
+Both auto-deploy from `main`. The Vercel project builds from the repo root with
+the settings in `vercel.json`; the Render service is a Node web service with the
+env in `render.yaml` (secrets set in the dashboard, never in git). The rest of
+this file is the from-scratch recipe.
+
+---
+
 Backend on **Render** (free), frontend on **Vercel** (free). Everything runs on
 Unicity **testnet2**. Two config files drive it: `render.yaml` (backend) and
 `vercel.json` (frontend). You only need to click through the two dashboards and
