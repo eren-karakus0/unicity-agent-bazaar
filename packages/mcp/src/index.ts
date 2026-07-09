@@ -15,7 +15,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { canonicalReceipt } from '@bazaar/core';
 import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
 import { z } from 'zod';
-import { BazaarClient, type ListingLite, type Signer } from '@bazaar/agent-kit';
+import { BazaarClient, type Signer } from '@bazaar/agent-kit';
 import { McpWallet } from './wallet.js';
 import { inputContract, summarizeListing } from './format.js';
 

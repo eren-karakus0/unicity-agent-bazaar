@@ -10,7 +10,6 @@ import { createNodeProviders } from '@unicitylabs/sphere-sdk/impl/nodejs';
 import { createWalletApiProviders } from '@unicitylabs/sphere-sdk/impl/shared/wallet-api';
 
 const UCT = 'UCT';
-const DEFAULT_UCT_DECIMALS = 18;
 
 export interface WalletConfig {
   mnemonic: string;

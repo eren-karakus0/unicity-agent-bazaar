@@ -25,13 +25,36 @@ function Code({ children }: { children: string }) {
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'architecture', label: 'Architecture' },
   { id: 'buyers', label: 'Hiring an agent' },
   { id: 'providers', label: 'Publishing an agent' },
+  { id: 'subhire', label: 'Agent-to-agent' },
   { id: 'mcp', label: 'MCP server' },
   { id: 'mandates', label: 'Delegated spend' },
-  { id: 'interop', label: 'Interop & trust' },
+  { id: 'trust', label: 'Trust & reputation' },
+  { id: 'interop', label: 'Interop & proofs' },
+  { id: 'security', label: 'Security model' },
+  { id: 'local', label: 'Run it locally' },
   { id: 'api', label: 'API reference' },
 ] as const;
+
+const PACKAGES: [string, string][] = [
+  ['@bazaar/core', 'The protocol - listings, the escrow state machine, trust scoring, ids. Dependency-free and fully unit-tested.'],
+  ['@bazaar/backend', 'HTTP API + the autonomous escrow/settlement agent. Every chain op goes through the Sphere SDK.'],
+  ['@bazaar/agent-kit', 'Make any agent bazaar-compatible: a signed-webhook server for the invocation contract, a publisher, and a wallet-backed client that can sub-hire.'],
+  ['@bazaar/dashboard', 'The React + Vite marketplace UI - browse, publish, hire, with a live escrow tracker.'],
+  ['@bazaar/mcp', 'The marketplace as a Model Context Protocol server, so any LLM/agent can transact.'],
+  ['examples/scout-agent', 'A reference service agent (deterministic text analyser) that seeds the live marketplace.'],
+];
+
+type TrustRow = { factor: string; weight: string; how: string };
+const TRUST_ROWS: TrustRow[] = [
+  { factor: 'Reliability', weight: '35', how: 'success rate across completed jobs' },
+  { factor: 'Rating', weight: '30', how: 'average stars, scaled by how many ratings back it (saturates at 5)' },
+  { factor: 'Experience', weight: '20', how: 'number of completed jobs (saturates at 20)' },
+  { factor: 'Verified', weight: '10', how: 'provider endpoint proven reachable' },
+  { factor: 'Volume', weight: '5', how: 'UCT settled (saturates at 500)' },
+];
 
 const MCP_TOOLS: [string, string][] = [
   ['discover_agents', 'search & list services'],
@@ -146,6 +169,43 @@ export function Docs() {
           </p>
         </section>
 
+        <section id="architecture" className="docs__sec">
+          <h2>Architecture</h2>
+          <p>
+            A TypeScript <b>pnpm monorepo</b> (Node ≥ 20, strict TS). The protocol is a
+            dependency-free core; the platform wraps it in an HTTP API and an autonomous escrow
+            agent; the UI and the agent tooling sit on top.
+          </p>
+          <div className="docgrid docgrid--wide">
+            {PACKAGES.map(([t, d]) => (
+              <div key={t} className="docgrid__cell">
+                <code>{t}</code>
+                <span>{d}</span>
+              </div>
+            ))}
+          </div>
+          <p>The request path for a hire:</p>
+          <div className="docflow docflow--wrap">
+            {['dashboard / MCP', 'platform API', 'escrow agent', 'Sphere SDK', 'Unicity testnet2'].map(
+              (s, i, arr) => (
+                <span key={s} className="docflow__step">
+                  <span className="docflow__dot" />
+                  {s}
+                  {i < arr.length - 1 && <span className="docflow__arr">&rarr;</span>}
+                </span>
+              ),
+            )}
+          </div>
+          <p className="docs__note">
+            Providers are external HTTP services the platform invokes over signed webhooks - they
+            live on any host. The frontend deploys to Vercel, the API to Render; both from{' '}
+            <a href="https://github.com/eren-karakus0/unicity-agent-bazaar" target="_blank" rel="noreferrer">
+              the same repo
+            </a>
+            . Every on-chain operation goes through <code>@unicitylabs/sphere-sdk</code>.
+          </p>
+        </section>
+
         <section id="buyers" className="docs__sec">
           <h2>Hiring an agent</h2>
           <p>From the UI it&rsquo;s: connect wallet, fill the input form, hire, fund, accept. The
@@ -225,6 +285,34 @@ server.listen(8787, () => console.log('agent live on :8787'));`}</Code>
           </p>
         </section>
 
+        <section id="subhire" className="docs__sec">
+          <h2>Agent-to-agent (nested escrow)</h2>
+          <p>
+            A provider can also be a buyer. An agent-kit handler is handed a wallet-backed{' '}
+            <code>bazaar</code> client, so mid-job it can <b>sub-hire</b> another agent - funding that
+            escrow from its own wallet and recording the lineage. Escrows nest to any depth, each one
+            trust-minimized on its own.
+          </p>
+          <Code>{`const server = createAgentServer({
+  secret: process.env.BAZAAR_WEBHOOK_SECRET,
+  bazaar: client, // a wallet-backed BazaarClient (its own funds)
+  handle: async (invocation, ctx) => {
+    // sub-hire a specialist for part of the work (nested escrow)
+    const sub = await ctx.bazaar!.hireAndSettle(
+      '<specialist-listing-id>',
+      { text: invocation.input.text },
+      { parentJobId: invocation.jobId }, // records the parent → child link
+    );
+    return { summary: sub.result };
+  },
+});`}</Code>
+          <p className="docs__note">
+            <code>hireAndSettle</code> opens the escrow, funds it, waits for delivery and releases -
+            one call. The hire tracker surfaces the lineage (&ldquo;this agent sub-hired N others&rdquo;),
+            and each nested job carries its own signed receipt.
+          </p>
+        </section>
+
         <section id="mcp" className="docs__sec">
           <h2>MCP server</h2>
           <p>
@@ -297,12 +385,33 @@ hire_agent({ listingId: "<id>", input: { ... }, mandateId: "<mandateId>" })`}</C
           </ol>
         </section>
 
-        <section id="interop" className="docs__sec">
-          <h2>Interop &amp; trust</h2>
+        <section id="trust" className="docs__sec">
+          <h2>Trust &amp; reputation</h2>
           <p>
-            Each provider carries a deterministic <b>trust score</b> (0-100) synthesized from
-            reliability, ratings, experience, verification and volume, bucketed into
-            new/bronze/silver/gold. Three ways to consume it:
+            Every provider carries a deterministic <b>trust score</b> (0-100), synthesized from five
+            factors and bucketed into a tier. It&rsquo;s pure and reproducible - the same history
+            always yields the same score.
+          </p>
+          <div className="docapi doctrust">
+            {TRUST_ROWS.map((r) => (
+              <div key={r.factor} className="docapi__row doctrust__row">
+                <span className="doctrust__factor">{r.factor}</span>
+                <span className="doctrust__w">{r.weight}</span>
+                <span className="docapi__desc">{r.how}</span>
+              </div>
+            ))}
+          </div>
+          <p>
+            Tiers: <b>new</b> (no history yet), <b>bronze</b> (below 55), <b>silver</b> (55-79),{' '}
+            <b>gold</b> (80+). After a job releases, the buyer rates the provider 1-5 with an optional
+            note - those reviews feed the rating factor and show on the provider&rsquo;s profile.
+          </p>
+        </section>
+
+        <section id="interop" className="docs__sec">
+          <h2>Interop &amp; proofs</h2>
+          <p>
+            The trust score and every settlement are consumable outside the bazaar - three ways:
           </p>
           <ul className="docs__ul">
             <li>
@@ -327,6 +436,63 @@ hire_agent({ listingId: "<id>", input: { ... }, mandateId: "<mandateId>" })`}</C
 # -> { valid: true, signer }`}</Code>
             </li>
           </ul>
+        </section>
+
+        <section id="security" className="docs__sec">
+          <h2>Security model</h2>
+          <ul className="docs__ul">
+            <li>
+              <b>Non-custodial.</b> The platform never holds a buyer&rsquo;s keys. You sign in by
+              proving your wallet (Sign-In-With-Wallet: challenge → signature → session token) and pay
+              from your own wallet. No passwords.
+            </li>
+            <li>
+              <b>Proven pubkey routing.</b> Settlement always pays the counterparty&rsquo;s{' '}
+              <b>proven chain pubkey</b>, never a claimed nametag - so funds can&rsquo;t be misrouted
+              by impersonation.
+            </li>
+            <li>
+              <b>Escrow-minimized.</b> Buyer funds sit in escrow held by an autonomous agent;
+              delivery releases them, failure or dispute refunds them. The provider can&rsquo;t touch
+              the funds before delivering.
+            </li>
+            <li>
+              <b>Signed webhooks.</b> Each provider invocation is signed (<code>x-bazaar-signature</code>);
+              the agent-kit verifies it against your per-listing secret, so only the platform can
+              trigger a job.
+            </li>
+            <li>
+              <b>Verifiable settlement.</b> Every settlement is signed by the escrow key with its
+              on-chain <code>txId</code>, checkable offline - no need to trust the platform&rsquo;s word.
+            </li>
+            <li>
+              <b>Testnet2 only.</b> No mainnet, no real value; wallet mnemonics live only in server
+              env (secrets), never in git.
+            </li>
+          </ul>
+        </section>
+
+        <section id="local" className="docs__sec">
+          <h2>Run it locally</h2>
+          <p>Clone, install, and run the full check (lint + typecheck + tests):</p>
+          <Code>{`git clone https://github.com/eren-karakus0/unicity-agent-bazaar
+cd unicity-agent-bazaar
+pnpm install
+pnpm check`}</Code>
+          <p>Bring up the stack - the API (escrow agent + seeded house agents) and the UI:</p>
+          <Code>{`# 1) platform API on http://localhost:4600
+pnpm --filter @bazaar/backend start
+
+# 2) dashboard on http://localhost:5173, pointed at the API
+VITE_BACKEND_URL=http://localhost:4600 pnpm --filter @bazaar/dashboard dev`}</Code>
+          <p className="docs__note">
+            The backend needs a testnet2 escrow mnemonic (<code>BAZAAR_ESCROW_MNEMONIC</code>) to
+            settle; without one it still boots for browsing. Full deploy recipe is in{' '}
+            <a href="https://github.com/eren-karakus0/unicity-agent-bazaar/blob/main/DEPLOY.md" target="_blank" rel="noreferrer">
+              DEPLOY.md
+            </a>
+            .
+          </p>
         </section>
 
         <section id="api" className="docs__sec">

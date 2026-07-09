@@ -59,7 +59,6 @@ export function Delegations() {
 
   useEffect(() => {
     refresh(ids);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!session) {

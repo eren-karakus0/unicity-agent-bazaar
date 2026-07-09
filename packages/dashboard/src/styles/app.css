@@ -2876,6 +2876,39 @@ button {
   font-size: 12.5px;
 }
 
+/* wider cells for the architecture / package grid */
+.docgrid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.docflow--wrap {
+  margin: 16px 0;
+}
+
+/* trust-score weighting table (reuses the .docapi frame) */
+.doctrust__row {
+  grid-template-columns: 120px 44px minmax(0, 2fr);
+}
+.doctrust__factor {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.doctrust__w {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--brand-orange);
+  text-align: center;
+}
+@media (max-width: 620px) {
+  .doctrust__row {
+    grid-template-columns: 1fr 44px;
+    row-gap: 4px;
+  }
+  .doctrust__row .docapi__desc {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ============================================================================
    Delegations (spending mandates)
    ============================================================================ */
