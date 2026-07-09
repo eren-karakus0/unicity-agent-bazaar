@@ -138,10 +138,15 @@ export function Marketplace({ online }: { online: boolean | null }) {
   useEffect(() => setPage(1), [cat, query, sort]);
   useEffect(() => setNetPage(1), [query, netOn]);
 
+  // Clamp for the slice: the page-reset effect runs post-paint, so on the render
+  // where a filter shrinks the list below the current page we'd otherwise slice
+  // out of range and flash an empty grid for one frame.
   const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
-  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const safePage = Math.min(page, pageCount);
+  const pageItems = shown.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const netPageCount = Math.max(1, Math.ceil((net?.length ?? 0) / PAGE_SIZE));
-  const netItems = (net ?? []).slice((netPage - 1) * PAGE_SIZE, netPage * PAGE_SIZE);
+  const safeNetPage = Math.min(netPage, netPageCount);
+  const netItems = (net ?? []).slice((safeNetPage - 1) * PAGE_SIZE, safeNetPage * PAGE_SIZE);
 
   return (
     <>
@@ -236,7 +241,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
 
       {err && <div className="empty">couldn&rsquo;t reach the bazaar - {err}</div>}
       {!err && listings === null && <SkeletonCards n={6} />}
-      {!err && listings !== null && shown.length === 0 && (listings.length > 0 || query || cat !== 'all') ? (
+      {!err && listings !== null && listings.length > 0 && shown.length === 0 && (query || cat !== 'all') ? (
         <div className="empty">no services match your search - try a different term or category.</div>
       ) : null}
       {!err && listings !== null && listings.length === 0 && (
@@ -269,7 +274,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
               />
             ))}
           </div>
-          <Pager page={page} pageCount={pageCount} total={shown.length} onPage={setPage} noun="services" />
+          <Pager page={safePage} pageCount={pageCount} total={shown.length} onPage={setPage} noun="services" />
         </>
       )}
 
@@ -290,7 +295,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
               <NetCard key={`${it.source}-${it.id}`} item={it} delay={i * 0.04} />
             ))}
           </div>
-          <Pager page={netPage} pageCount={netPageCount} total={net.length} onPage={setNetPage} noun="intents" />
+          <Pager page={safeNetPage} pageCount={netPageCount} total={net.length} onPage={setNetPage} noun="intents" />
         </>
       )}
 

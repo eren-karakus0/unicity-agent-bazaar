@@ -21,6 +21,7 @@ const STEPS: { key: EscrowState; label: string }[] = [
   { key: 'released', label: 'released' },
 ];
 const ORDER: EscrowState[] = ['quoted', 'funded', 'delivered', 'released'];
+const TERMINAL: EscrowState[] = ['released', 'refunded', 'cancelled'];
 
 /** whole UCT → base-unit integer string, without floating-point error. */
 function toBaseUnits(amountUct: number, decimals: number): string {
@@ -47,6 +48,20 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
     [],
   );
 
+  // While the dialog is open, Esc closes it and the page behind it can't scroll.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   const openEscrow = async () => {
     setErr(null);
     if (schema.length > 0) {
@@ -62,7 +77,18 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
         schema.length > 0 ? buildInput(schema, values) : input.trim() ? { text: input } : {};
       const h = await api.hire(listing.id, parsed);
       setHire(h);
-      const tick = () => api.job(h.job.jobId).then(setJobv).catch(() => {});
+      const tick = () =>
+        api
+          .job(h.job.jobId)
+          .then((jv) => {
+            setJobv(jv);
+            // Stop polling once the escrow reaches a terminal state.
+            if (pollRef.current !== null && TERMINAL.includes(jv.job.state)) {
+              window.clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+          })
+          .catch(() => {});
       tick();
       pollRef.current = window.setInterval(tick, 2500);
     } catch (e) {

@@ -26,7 +26,18 @@ function parseRoute(): Route {
   if (p.startsWith('/publish')) return { name: 'publish' };
   if (p.startsWith('/docs')) return { name: 'docs' };
   if (p.startsWith('/delegations')) return { name: 'delegations' };
-  if (p.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(p.slice('/agent/'.length)) };
+  if (p.startsWith('/agent/')) {
+    const raw = p.slice('/agent/'.length);
+    // decodeURIComponent throws on a malformed escape; fall back to the raw
+    // slug so a bad deep link never white-screens the app.
+    let principal = raw;
+    try {
+      principal = decodeURIComponent(raw);
+    } catch {
+      /* keep raw */
+    }
+    return { name: 'profile', principal };
+  }
   if (p.startsWith('/profile')) return { name: 'profile', principal: null };
   return { name: 'landing' };
 }
@@ -37,10 +48,9 @@ export function App() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onNav = () => {
-      setRoute(parseRoute());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    // Re-parse on navigation. Scroll-to-top is handled in go() so genuine
+    // back/forward keeps the browser's restored scroll position.
+    const onNav = () => setRoute(parseRoute());
     window.addEventListener('popstate', onNav);
     return () => window.removeEventListener('popstate', onNav);
   }, []);
