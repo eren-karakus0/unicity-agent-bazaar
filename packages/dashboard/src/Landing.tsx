@@ -338,6 +338,9 @@ function LifecycleScene() {
       {/* base connectors */}
       <line className="fx-base" x1={B.x} y1={B.y} x2={E.x} y2={E.y} />
       <line className="fx-base" x1={E.x} y1={E.y} x2={A.x} y2={A.y} />
+      {/* ambient flow: light continuously seeps buyer → escrow → agent */}
+      <line className="fx-flow" x1={B.x} y1={B.y} x2={E.x} y2={E.y} />
+      <line className="fx-flow fx-flow--2" x1={E.x} y1={E.y} x2={A.x} y2={A.y} />
       {/* lit progress segments (drawn by the timeline) */}
       <line className="fx-seg1" x1={B.x} y1={B.y} x2={E.x} y2={E.y} />
       <line className="fx-seg2" x1={E.x} y1={E.y} x2={A.x} y2={A.y} />
@@ -399,7 +402,19 @@ function AgentNetwork() {
       {SATS.map((s, i) => {
         const n = SATS[(i + 1) % SATS.length];
         if (!n) return null;
-        return <line key={`r${i}`} className="net-ring" x1={s.x} y1={s.y} x2={n.x} y2={n.y} />;
+        return (
+          <g key={`r${i}`}>
+            <line className="net-ring" x1={s.x} y1={s.y} x2={n.x} y2={n.y} />
+            <line
+              className="net-ringflow"
+              x1={s.x}
+              y1={s.y}
+              x2={n.x}
+              y2={n.y}
+              style={{ animationDelay: `${i * 0.33}s` }}
+            />
+          </g>
+        );
       })}
       {SATS.map((s, i) => (
         <g key={`s${i}`}>

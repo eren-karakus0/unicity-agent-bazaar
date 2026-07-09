@@ -3332,6 +3332,15 @@ html.lenis body {
     stroke-dashoffset: 0;
   }
 }
+/* light that chases around the hex ring, node to node */
+.net-ringflow {
+  stroke: var(--orange-lift);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 128;
+  filter: drop-shadow(0 0 4px rgba(255, 111, 0, 0.7));
+  animation: netFlow 2.4s linear infinite;
+}
 .net-node {
   transform-box: fill-box;
   transform-origin: center;
@@ -4023,6 +4032,28 @@ html.lenis body {
   stroke-dasharray: 320;
   stroke-dashoffset: 320;
   filter: drop-shadow(0 0 4px rgba(255, 111, 0, 0.55));
+}
+/* ambient traveling light along the connectors - always flowing, so the scene
+   feels alive between (and during) the scrubbed timeline. buyer → escrow → agent */
+.fx-flow {
+  fill: none;
+  stroke: var(--orange-lift);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 10 300;
+  filter: drop-shadow(0 0 6px rgba(255, 111, 0, 0.8));
+  animation: fxFlow 2.3s linear infinite;
+}
+.fx-flow--2 {
+  animation-delay: 1.15s;
+}
+@keyframes fxFlow {
+  from {
+    stroke-dashoffset: 310;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .fx-node-hex {
   fill: var(--bg-raised);
