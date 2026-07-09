@@ -28,7 +28,7 @@ function toBaseUnits(amountUct: number, decimals: number): string {
 }
 
 export function HireDialog({ listing, onClose }: { listing: Listing; onClose: () => void }) {
-  const { session, phase, signIn, wallet, refreshBalance } = useAuth();
+  const { session, phase, signIn, wallet, refreshBalance, balance } = useAuth();
   const schema = listing.inputSchema ?? [];
   const [input, setInput] = useState('');
   const [values, setValues] = useState<FieldValues>(() => initialValues(schema));
@@ -194,7 +194,9 @@ export function HireDialog({ listing, onClose }: { listing: Listing; onClose: ()
                     One click opens your wallet to approve the transfer - the memo is attached automatically. Or
                     send {hire.amountUct} UCT to {hire.payTo} manually with the memo above.
                   </div>
-                  <UctRates />
+                  {balance !== null && Number(balance) < hire.amountUct && (
+                    <UctRates short={Math.ceil(hire.amountUct - Number(balance))} />
+                  )}
                 </>
               )}
 
@@ -516,11 +518,12 @@ function ReviewBlock({
 }
 
 /**
- * Short on UCT? Surface live peer offers to acquire it, pulled from Unicity's
- * decentralized market feed. These are real maker offers on the open network,
- * not an automated swap - honest "pay in any token" discovery.
+ * Shown only when the buyer's wallet can't cover the price. Surfaces live peer
+ * offers to acquire UCT, pulled from Unicity's decentralized market feed. These
+ * are real maker offers on the open network, not an automated swap - honest
+ * "pay in any token" discovery.
  */
-function UctRates() {
+function UctRates({ short }: { short: number }) {
   const [rates, setRates] = useState<UctRate[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -537,7 +540,7 @@ function UctRates() {
   return (
     <div className="uctrates">
       <div className="uctrates__h">
-        <span className="netsrc__hex">⬡</span> Short on UCT? Live peer offers on Unicity
+        <span className="netsrc__hex">⬡</span> Short {short} UCT - live peer offers on Unicity
       </div>
       <div className="uctrates__list">
         {rates.map((r) => (

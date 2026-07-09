@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, CATEGORIES, type Category, type DiscoverItem, type Listing } from './lib/api';
 import { HireDialog } from './HireDialog';
 import { SkeletonCards } from './Skeletons';
 import { useAuth } from './lib/auth';
 import { useToast } from './lib/toast';
 import { go } from './lib/nav';
+
+const PAGE_SIZE = 9;
 
 type SortKey = 'newest' | 'trending' | 'rating' | 'price-asc' | 'price-desc';
 
@@ -34,15 +36,15 @@ export function Marketplace({ online }: { online: boolean | null }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('newest');
   const [hiring, setHiring] = useState<Listing | null>(null);
-  const [stats, setStats] = useState<Awaited<ReturnType<typeof api.stats>> | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [net, setNet] = useState<DiscoverItem[] | null>(null);
   const [netOn, setNetOn] = useState(false);
+  const [page, setPage] = useState(1);
+  const [netPage, setNetPage] = useState(1);
 
   useEffect(() => {
     api.listings().then(setListings).catch((e) => setErr(e instanceof Error ? e.message : 'failed'));
     api.trending(4).then(setTrending).catch(() => {});
-    api.stats().then(setStats).catch(() => {});
     api
       .marketStatus()
       .then((s) => setNetOn(s.available))
@@ -132,44 +134,38 @@ export function Marketplace({ online }: { online: boolean | null }) {
     return [...arr].sort(SORTERS[sort]);
   }, [listings, cat, query, sort]);
 
+  // Any change to the filters resets to the first page so results stay in view.
+  useEffect(() => setPage(1), [cat, query, sort]);
+  useEffect(() => setNetPage(1), [query, netOn]);
+
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const netPageCount = Math.max(1, Math.ceil((net?.length ?? 0) / PAGE_SIZE));
+  const netItems = (net ?? []).slice((netPage - 1) * PAGE_SIZE, netPage * PAGE_SIZE);
+
   return (
     <>
-      <section className="hero">
-        <div className="hero__kick">the machine economy, open for business</div>
-        <h1 className="hero__h">
-          Hire an agent.
-          <br />
-          <span>Pay on delivery.</span>
-        </h1>
-        <p className="hero__sub">
-          Browse autonomous agents offering services on Unicity. Hire one and your UCT sits in on-chain
-          escrow - released only when the work is delivered, refunded if it isn&rsquo;t.
-        </p>
-        <div className="hero__chips">
-          <span className="chip">
-            <b>escrow</b> funds held until delivery
-          </span>
-          <span className="chip">
-            <b>on-chain</b> settled in real UCT
-          </span>
-          <span className="chip">
-            <b>open</b> publish your own agent
-          </span>
+      <section className="mkthd">
+        <div className="mkthd__l">
+          <span className="mkthd__kick">marketplace</span>
+          <h1 className="mkthd__h">Hire an agent</h1>
+          <p className="mkthd__sub">
+            Browse autonomous agents offering services on Unicity. Your UCT sits in on-chain escrow -
+            released on delivery, refunded if the work fails.
+          </p>
         </div>
-        {!session && (
-          <div className="hero__cta">
+        {!session ? (
+          <div className="mkthd__cta">
             <button className="btn btn--primary" onClick={() => void signIn()}>
-              Connect wallet to get started
+              Connect wallet
             </button>
-            <span className="hero__cta-note">no sign-up - one signature proves your wallet</span>
+            <span className="mkthd__note">one signature proves your wallet</span>
           </div>
-        )}
-        {stats && (stats.listings > 0 || stats.jobsSettled > 0) && (
-          <div className="ticker">
-            <Metric n={stats.providers} label="agents" />
-            <Metric n={stats.listings} label="services" />
-            <Metric n={stats.jobsSettled} label="jobs settled" />
-            <Metric n={stats.uctSettled} label="UCT flowed" accent />
+        ) : (
+          <div className="mkthd__cta">
+            <button className="btn btn--ghost" onClick={() => go('/publish')}>
+              Publish an agent &rarr;
+            </button>
           </div>
         )}
       </section>
@@ -260,18 +256,21 @@ export function Marketplace({ online }: { online: boolean | null }) {
       )}
 
       {shown.length > 0 && (
-        <div className="grid">
-          {shown.map((l, i) => (
-            <ListingCard
-              key={l.id}
-              listing={l}
-              delay={i * 0.05}
-              faved={favIds.has(l.id)}
-              onHire={() => setHiring(l)}
-              onFav={() => toggleFav(l)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid">
+            {pageItems.map((l, i) => (
+              <ListingCard
+                key={l.id}
+                listing={l}
+                delay={i * 0.05}
+                faved={favIds.has(l.id)}
+                onHire={() => setHiring(l)}
+                onFav={() => toggleFav(l)}
+              />
+            ))}
+          </div>
+          <Pager page={page} pageCount={pageCount} total={shown.length} onPage={setPage} noun="services" />
+        </>
       )}
 
       {netOn && net && net.length > 0 && (
@@ -287,80 +286,49 @@ export function Marketplace({ online }: { online: boolean | null }) {
             listings are broadcast here too, so agents anywhere can find them.
           </p>
           <div className="grid">
-            {net.map((it, i) => (
+            {netItems.map((it, i) => (
               <NetCard key={`${it.source}-${it.id}`} item={it} delay={i * 0.04} />
             ))}
           </div>
+          <Pager page={netPage} pageCount={netPageCount} total={net.length} onPage={setNetPage} noun="intents" />
         </>
       )}
-
-      <HowItWorks />
 
       {hiring && <HireDialog listing={hiring} onClose={() => setHiring(null)} />}
     </>
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    {
-      n: 1,
-      t: 'Connect & sign in',
-      d: 'Prove your wallet with a single signature - no passwords, and the platform never holds your keys.',
-    },
-    {
-      n: 2,
-      t: 'Hire & fund escrow',
-      d: 'Your UCT moves into on-chain escrow the moment you hire. The agent can’t touch it until the work is done.',
-    },
-    {
-      n: 3,
-      t: 'Delivered, or refunded',
-      d: 'Release the funds when the result lands. If the job fails or you dispute it, your UCT comes back.',
-    },
-  ];
+/** Prev / next page control with a live position + total count. Renders nothing
+ *  for a single page, so short lists stay clean. */
+function Pager({
+  page,
+  pageCount,
+  total,
+  onPage,
+  noun,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  onPage: (p: number) => void;
+  noun: string;
+}) {
+  if (pageCount <= 1) return null;
   return (
-    <section className="how">
-      <div className="sec">
-        <span className="sec__t">How it works</span>
-        <span className="sec__c">escrow, end to end</span>
-      </div>
-      <div className="how__grid">
-        {steps.map((s) => (
-          <div className="howstep" key={s.n}>
-            <span className="howstep__n">{s.n}</span>
-            <div>
-              <div className="howstep__t">{s.t}</div>
-              <div className="howstep__d">{s.d}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="pager">
+      <button className="pager__b" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        &larr; prev
+      </button>
+      <span className="pager__n">
+        page <b>{page}</b> of {pageCount}
+        <span className="pager__c"> · {total} {noun}</span>
+      </span>
+      <button className="pager__b" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>
+        next &rarr;
+      </button>
+    </div>
   );
-}
-
-/** Ease-out count-up from 0 to `target` the first time the value lands. */
-function useCountUp(target: number, ms = 900): number {
-  const [val, setVal] = useState(0);
-  const raf = useRef(0);
-  useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      setVal(target);
-      return;
-    }
-    const from = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / ms);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(from + (target - from) * eased));
-      if (p < 1) raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, [target, ms]);
-  return val;
 }
 
 function ago(ts: number): string {
@@ -403,16 +371,6 @@ function NetCard({ item, delay }: { item: DiscoverItem; delay: number }) {
         </span>
       </div>
     </article>
-  );
-}
-
-function Metric({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
-  const shown = useCountUp(n);
-  return (
-    <div className="metric">
-      <span className={`metric__n${accent ? ' metric__n--accent' : ''}`}>{shown.toLocaleString()}</span>
-      <span className="metric__l">{label}</span>
-    </div>
   );
 }
 

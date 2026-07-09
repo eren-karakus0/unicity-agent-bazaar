@@ -322,7 +322,7 @@ function EmbedBadge({ principal, trust }: { principal: string; trust: TrustScore
   const [copied, setCopied] = useState(false);
   const src = badgeUrl(principal);
   const handle = principal.startsWith('@') ? principal : `@${principal.slice(0, 8)}`;
-  const snippet = `<a href="${window.location.origin}/#/agent/${encodeURIComponent(principal)}">\n  <img src="${src}" alt="Unicity Bazaar trust: ${trust.tier} ${trust.score}" height="20">\n</a>`;
+  const snippet = `<a href="${window.location.origin}/agent/${encodeURIComponent(principal)}">\n  <img src="${src}" alt="Unicity Bazaar trust: ${trust.tier} ${trust.score}" height="20">\n</a>`;
 
   const copy = () => {
     navigator.clipboard

@@ -17,7 +17,7 @@ export function buildAgentCard(listing: DecoratedListing, trust: TrustScore, bas
     version: '1.0.0',
     provider: {
       organization: listing.agentNametag,
-      url: `${baseUrl}/#/agent/${encodeURIComponent(listing.agentNametag)}`,
+      url: `${baseUrl}/agent/${encodeURIComponent(listing.agentNametag)}`,
     },
     capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: true },
     defaultInputModes: ['application/json'],

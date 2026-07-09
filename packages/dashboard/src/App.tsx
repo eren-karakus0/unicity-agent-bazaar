@@ -4,6 +4,7 @@ import { useAuth, displayName } from './lib/auth';
 import { useNotifications } from './lib/notifications';
 import { go } from './lib/nav';
 import { LogoMark } from './Logo';
+import { Landing } from './Landing';
 import { Marketplace } from './Marketplace';
 import { Publish } from './Publish';
 import { Profile } from './Profile';
@@ -11,34 +12,37 @@ import { Docs } from './Docs';
 import { Delegations } from './Delegations';
 
 type Route =
+  | { name: 'landing' }
   | { name: 'market' }
   | { name: 'publish' }
   | { name: 'docs' }
   | { name: 'delegations' }
   | { name: 'profile'; principal: string | null };
 
-function parseHash(): Route {
-  const h = location.hash.replace(/^#/, '');
-  if (h.startsWith('/publish')) return { name: 'publish' };
-  if (h.startsWith('/docs')) return { name: 'docs' };
-  if (h.startsWith('/delegations')) return { name: 'delegations' };
-  if (h.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(h.slice('/agent/'.length)) };
-  if (h.startsWith('/profile')) return { name: 'profile', principal: null };
-  return { name: 'market' };
+function parseRoute(): Route {
+  const p = location.pathname.replace(/\/+$/, '') || '/';
+  if (p === '/') return { name: 'landing' };
+  if (p === '/marketplace') return { name: 'market' };
+  if (p.startsWith('/publish')) return { name: 'publish' };
+  if (p.startsWith('/docs')) return { name: 'docs' };
+  if (p.startsWith('/delegations')) return { name: 'delegations' };
+  if (p.startsWith('/agent/')) return { name: 'profile', principal: decodeURIComponent(p.slice('/agent/'.length)) };
+  if (p.startsWith('/profile')) return { name: 'profile', principal: null };
+  return { name: 'landing' };
 }
 
 export function App() {
-  const [route, setRoute] = useState<Route>(parseHash);
+  const [route, setRoute] = useState<Route>(parseRoute);
   const [online, setOnline] = useState<boolean | null>(null);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onHash = () => {
-      setRoute(parseHash());
+    const onNav = () => {
+      setRoute(parseRoute());
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    window.addEventListener('popstate', onNav);
+    return () => window.removeEventListener('popstate', onNav);
   }, []);
 
   // Header condenses + gains a shadow once the page scrolls past the hero edge.
@@ -101,7 +105,7 @@ export function App() {
           <nav className="hdr__nav">
             <button
               className={`navlink${route.name === 'market' ? ' navlink--on' : ''}`}
-              onClick={() => go('/')}
+              onClick={() => go('/marketplace')}
             >
               marketplace
             </button>
@@ -129,11 +133,12 @@ export function App() {
         </div>
       </header>
 
-      <main className="wrap">
+      <main className={route.name === 'landing' ? '' : 'wrap'}>
         <div
           className="page"
           key={route.name === 'profile' ? `profile:${route.principal ?? 'me'}` : route.name}
         >
+          {route.name === 'landing' && <Landing online={online} />}
           {route.name === 'market' && <Marketplace online={online} />}
           {route.name === 'publish' && <Publish />}
           {route.name === 'docs' && <Docs />}
@@ -142,19 +147,62 @@ export function App() {
         </div>
       </main>
 
-      <footer className="wrap foot">
-        <span>
-          <b>Unicity Agent Bazaar</b> - hire an agent, pay on delivery.
-        </span>
-        <span className="foot__links">
-          <button className="foot__link" onClick={() => go('/docs')}>
-            docs
-          </button>
-          <span className="foot__sep">·</span>
-          escrow-settled on testnet2 · SDK-only · $0
-        </span>
-      </footer>
+      <SiteFooter online={online} />
     </>
+  );
+}
+
+function SiteFooter({ online }: { online: boolean | null }) {
+  const year = new Date().getFullYear();
+  return (
+    <footer className="sitefoot">
+      <div className="wrap sitefoot__in">
+        <div className="sitefoot__brand">
+          <button className="brand" onClick={() => go('/')} aria-label="Agent Bazaar home">
+            <LogoMark size={30} />
+            <span className="brand__name">
+              AGENT <em>BAZAAR</em>
+            </span>
+          </button>
+          <p className="sitefoot__tag">
+            The machine economy, open for business. Hire an autonomous agent, pay on delivery, settled
+            in on-chain escrow on Unicity.
+          </p>
+          <span className={`sitefoot__net${online ? ' sitefoot__net--on' : ''}`}>
+            <span className="hdr__dot" aria-hidden /> unicity testnet2 {online ? 'online' : '· waking'}
+          </span>
+        </div>
+
+        <div className="sitefoot__cols">
+          <div className="sitefoot__col">
+            <span className="sitefoot__h">Product</span>
+            <button onClick={() => go('/marketplace')}>Marketplace</button>
+            <button onClick={() => go('/publish')}>Publish an agent</button>
+            <button onClick={() => go('/delegations')}>Delegate spend</button>
+          </div>
+          <div className="sitefoot__col">
+            <span className="sitefoot__h">Developers</span>
+            <button onClick={() => go('/docs')}>Documentation</button>
+            <a href="https://github.com/eren-karakus0/unicity-agent-bazaar" target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+            <a href="https://www.npmjs.com/package/@unicitylabs/sphere-sdk" target="_blank" rel="noreferrer">
+              Sphere SDK
+            </a>
+          </div>
+          <div className="sitefoot__col">
+            <span className="sitefoot__h">Network</span>
+            <span className="sitefoot__muted">Unicity testnet2</span>
+            <span className="sitefoot__muted">Escrow-settled</span>
+            <span className="sitefoot__muted">SDK-only · $0</span>
+          </div>
+        </div>
+      </div>
+      <div className="wrap sitefoot__bar">
+        <span>© {year} Unicity Agent Bazaar</span>
+        <span>Built for the Build the Machine Economy program</span>
+      </div>
+    </footer>
   );
 }
 
