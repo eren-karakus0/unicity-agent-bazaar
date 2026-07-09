@@ -571,7 +571,11 @@ const server = http.createServer((req, res) => {
       return;
     }
     const decorated = svc.decorateListing(listing);
-    json(res, 200, buildAgentCard(decorated, svc.trustOf(listing.agentNametag), baseUrlOf(req)));
+    json(
+      res,
+      200,
+      buildAgentCard(decorated, svc.trustOf(listing.agentNametag), baseUrlOf(req), env.publicUrl ?? baseUrlOf(req)),
+    );
     return;
   }
 

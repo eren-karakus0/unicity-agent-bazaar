@@ -194,7 +194,7 @@ function SiteFooter({ online }: { online: boolean | null }) {
             <span className="sitefoot__h">Network</span>
             <span className="sitefoot__muted">Unicity testnet2</span>
             <span className="sitefoot__muted">Escrow-settled</span>
-            <span className="sitefoot__muted">SDK-only · $0</span>
+            <span className="sitefoot__muted">Open source · MIT</span>
           </div>
         </div>
       </div>

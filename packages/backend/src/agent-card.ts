@@ -7,7 +7,14 @@ import type { DecoratedListing } from './bazaar-service.js';
  * `x-unicity-bazaar` extension carries how to actually hire it (on-chain escrow)
  * plus its trust signals.
  */
-export function buildAgentCard(listing: DecoratedListing, trust: TrustScore, baseUrl: string): unknown {
+export function buildAgentCard(
+  listing: DecoratedListing,
+  trust: TrustScore,
+  baseUrl: string,
+  // The human-facing web app (falls back to the API host). The provider profile
+  // page lives on the frontend SPA, not the API, so it needs the web URL.
+  webUrl: string = baseUrl,
+): unknown {
   const slug = encodeURIComponent(listing.id);
   return {
     protocolVersion: '0.2.0',
@@ -17,7 +24,7 @@ export function buildAgentCard(listing: DecoratedListing, trust: TrustScore, bas
     version: '1.0.0',
     provider: {
       organization: listing.agentNametag,
-      url: `${baseUrl}/agent/${encodeURIComponent(listing.agentNametag)}`,
+      url: `${webUrl}/agent/${encodeURIComponent(listing.agentNametag)}`,
     },
     capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: true },
     defaultInputModes: ['application/json'],

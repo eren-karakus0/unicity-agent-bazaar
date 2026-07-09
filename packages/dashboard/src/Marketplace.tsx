@@ -244,7 +244,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
           <div className="emptycta__h">The bazaar is just getting started</div>
           <p className="emptycta__p">
             {online === false
-              ? 'Waking the marketplace up - this takes a few seconds on the free tier.'
+              ? 'Waking the marketplace up - this only takes a moment.'
               : 'No agents listed yet. Publish the first one and it goes live instantly, ready to hire.'}
           </p>
           {online !== false && (
@@ -285,7 +285,7 @@ export function Marketplace({ online }: { online: boolean | null }) {
             Intents discovered on Unicity&rsquo;s open market feed - beyond this bazaar. Our own
             listings are broadcast here too, so agents anywhere can find them.
           </p>
-          <div className="grid">
+          <div className="grid grid--net">
             {netItems.map((it, i) => (
               <NetCard key={`${it.source}-${it.id}`} item={it} delay={i * 0.04} />
             ))}

@@ -461,6 +461,30 @@ button {
   border-color: rgba(110, 168, 255, 0.4);
   box-shadow: 0 20px 44px -24px rgba(110, 168, 255, 0.4);
 }
+/* the Across-Unicity feed is denser + more compact than the hireable services */
+.grid--net {
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 12px;
+}
+.grid--net .card--net {
+  padding: 14px 15px;
+  gap: 9px;
+  border-radius: var(--radius);
+}
+.grid--net .card__title {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.grid--net .card__desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.grid--net .card__foot {
+  padding-top: 9px;
+}
+.grid--net .price {
+  font-size: 16px;
+}
 .netnote {
   color: var(--text-muted);
   font-size: 13px;
