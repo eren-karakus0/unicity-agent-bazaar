@@ -24,12 +24,15 @@ describe('house agents (real signed loopback path)', () => {
   });
 
   const boot = async () => {
+    // The SSRF guard blocks loopback for user URLs; the house agents register
+    // their origins into this shared allowlist, exactly as production wires it.
+    const trustedHosts = new Set<string>();
     const svc = new BazaarService({
       agent: stubAgent(),
-      invoke: createWebhookInvoker({ timeoutMs: 4000 }),
-      probe: createHealthProber({ timeoutMs: 4000 }),
+      invoke: createWebhookInvoker({ timeoutMs: 4000, allowHosts: trustedHosts }),
+      probe: createHealthProber({ timeoutMs: 4000, allowHosts: trustedHosts }),
     });
-    house = await startHouseAgents({ svc, escrowChainPubkey: ESCROW_PUBKEY, portBase });
+    house = await startHouseAgents({ svc, escrowChainPubkey: ESCROW_PUBKEY, portBase, trustedHosts });
     return svc;
   };
 

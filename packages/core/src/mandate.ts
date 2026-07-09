@@ -65,7 +65,9 @@ export interface MandateStatus {
 /**
  * The exact string that gets signed and verified. Field order is fixed (not left
  * to `JSON.stringify` key order) so the signed bytes are stable across platforms
- * and versions. Categories are sorted so ordering can't change the signature.
+ * and versions. Categories are sorted (so ordering can't change the signature)
+ * and kept as their own JSON array element - never joined into a string, so two
+ * different category lists can't collapse to identical signed bytes.
  * Never reorder without bumping `v`.
  */
 export function canonicalMandate(m: SpendingMandate): string {
@@ -77,7 +79,7 @@ export function canonicalMandate(m: SpendingMandate): string {
     m.agent,
     m.maxTotalUct,
     m.maxPerJobUct,
-    [...m.categories].sort().join(','),
+    [...m.categories].sort(),
     m.expiresAt,
     m.createdAt,
   ]);

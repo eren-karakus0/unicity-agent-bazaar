@@ -242,7 +242,7 @@ export function canonicalMandate(m: SpendingMandate): string {
     m.agent,
     m.maxTotalUct,
     m.maxPerJobUct,
-    [...m.categories].sort().join(','),
+    [...m.categories].sort(),
     m.expiresAt,
     m.createdAt,
   ]);

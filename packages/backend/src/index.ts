@@ -64,10 +64,13 @@ const snapshotFile = path.join(env.dataRoot, 'bazaar-state.json');
 
 async function boot(): Promise<void> {
   await escrowAgent.start();
+  // First-party loopback agents register their origin here so the SSRF guard
+  // permits them while still blocking user-supplied private/loopback URLs.
+  const trustedHosts = new Set<string>();
   service = new BazaarService({
     agent: escrowAgent,
-    invoke: createWebhookInvoker({ timeoutMs: 20_000 }),
-    probe: createHealthProber({ timeoutMs: 5_000 }),
+    invoke: createWebhookInvoker({ timeoutMs: 20_000, allowHosts: trustedHosts }),
+    probe: createHealthProber({ timeoutMs: 5_000, allowHosts: trustedHosts }),
     autoReleaseMs: env.autoReleaseMs,
     verify: verifySignedMessage,
     logger: createLogger('bazaar'),
@@ -89,6 +92,7 @@ async function boot(): Promise<void> {
     escrowChainPubkey: escrowAgent.chainPubkey,
     portBase: env.port,
     logger: createLogger('house'),
+    trustedHosts,
   });
 
   const persistAndExit = () => {

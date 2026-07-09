@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { DeliveryChannel, ServiceInvocation, ServiceResult } from '@bazaar/core';
+import { assertPublicUrl } from './net-guard.js';
 
 /**
  * Dispatches a job to a provider agent and returns its result. Injected into the
@@ -31,14 +32,16 @@ export interface HealthProbe {
 /** Probes a provider agent's reachability. Injected so publish flow is testable. */
 export type HealthProber = (url: string) => Promise<HealthProbe>;
 
-/** The real health prober: a short-timeout GET that treats any 2xx as reachable. */
-export function createHealthProber(opts?: { timeoutMs?: number }): HealthProber {
+/** The real health prober: a short-timeout GET that treats any 2xx as reachable.
+ *  `allowHosts` is a trusted-origin allowlist for first-party loopback agents. */
+export function createHealthProber(opts?: { timeoutMs?: number; allowHosts?: Set<string> }): HealthProber {
   const timeoutMs = opts?.timeoutMs ?? 5_000;
   return async (url) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      await assertPublicUrl(url, opts?.allowHosts); // SSRF guard
+      const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: controller.signal });
       if (!res.ok) return { ok: false, detail: `health returned HTTP ${res.status}` };
       return { ok: true };
     } catch (e) {
@@ -53,8 +56,9 @@ export function createHealthProber(opts?: { timeoutMs?: number }): HealthProber 
   };
 }
 
-/** The real invoker: POST the invocation to the provider's webhook. */
-export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
+/** The real invoker: POST the invocation to the provider's webhook.
+ *  `allowHosts` is a trusted-origin allowlist for first-party loopback agents. */
+export function createWebhookInvoker(opts?: { timeoutMs?: number; allowHosts?: Set<string> }): Invoker {
   const timeoutMs = opts?.timeoutMs ?? 20_000;
   return async (channel, invocation, secret) => {
     if (channel.kind !== 'webhook') {
@@ -64,6 +68,7 @@ export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      await assertPublicUrl(channel.url, opts?.allowHosts); // SSRF guard
       const body = JSON.stringify(invocation);
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (secret) {
@@ -74,6 +79,7 @@ export function createWebhookInvoker(opts?: { timeoutMs?: number }): Invoker {
         method: 'POST',
         headers,
         body,
+        redirect: 'manual',
         signal: controller.signal,
       });
       if (!res.ok) {

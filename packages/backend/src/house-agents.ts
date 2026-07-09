@@ -117,6 +117,9 @@ export async function startHouseAgents(opts: {
   escrowChainPubkey?: string;
   portBase: number;
   logger?: Logger;
+  /** Trusted-origin allowlist to register each loopback house URL into, so the
+   *  SSRF guard permits these first-party agents while still blocking user URLs. */
+  trustedHosts?: Set<string>;
 }): Promise<HouseAgentsHandle> {
   const log = opts.logger ?? createLogger('house');
   const servers: http.Server[] = [];
@@ -135,6 +138,9 @@ export async function startHouseAgents(opts: {
       const server = await listen(def.handle, port, secret);
       servers.push(server);
       const url = `http://127.0.0.1:${port}/`;
+      // Trust this first-party loopback origin so the SSRF guard allows the
+      // health probe + invocation (added before either fires).
+      opts.trustedHosts?.add(`127.0.0.1:${port}`);
       const listing = makeListing(
         {
           agentNametag: HOUSE_NAMETAG,

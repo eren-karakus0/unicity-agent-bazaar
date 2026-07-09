@@ -134,3 +134,37 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
 - **In-memory + file snapshot** is the known persistence limitation on free-tier
   hosting (see Infrastructure above). Session tokens survive restarts via a stable
   `BAZAAR_SESSION_SECRET`.
+
+### Audit hardening (applied)
+
+A security review drove these fixes:
+
+- **SSRF guard** on every outbound call to a provider-supplied webhook URL
+  (`net-guard.ts`): the host is resolved and loopback / private / link-local /
+  unique-local / multicast addresses are rejected (blocking cloud metadata and
+  RFC1918 internal hosts), and redirects are disabled. First-party house agents
+  live on loopback and are permitted via an explicit trusted-origin allowlist.
+- **Fail-closed authorization**: the buyer-only (accept/dispute) and owner-only
+  (test-invoke) checks now deny when the party record is missing, instead of
+  no-opping.
+- **Mandate registration is write-once per id**: a leaked `mandateId` can't be
+  re-registered by a different buyer to hijack or inherit spend counters.
+- **Mandate canonicalization**: `categories` are signed as their own JSON array
+  element (not a comma-joined string), so distinct category lists can't collapse
+  to identical signed bytes.
+
+### Known, accepted for the testnet demo (server+persistence phase)
+
+- **Nametag ↔ pubkey binding**: login accepts a self-declared `@nametag` without
+  on-chain ownership verification, so reputation (keyed by nametag) is spoofable.
+  Proper fix: verify nametag ownership against the chain registry at login, or
+  key reputation by proven pubkey. Belongs with the deferred auth+persistence
+  work (durable identity needs the database anyway).
+- **Refund routing binds to the recorded buyer, not the actual funder**: enables
+  a memo-based social-engineering refund-laundering path. Fix: capture the
+  funding sender and route refunds to it.
+- **Overpayment into escrow** has no automatic refund of the excess.
+- **Session token in `localStorage`** (defense-in-depth; no XSS sink exists
+  today — the badge SVG generator escapes all interpolated text).
+- **Public `GET /api/mandates/:id`** discloses buyer/agent pubkeys + live budget
+  to anyone holding the id (deliberate "verifiable, not trust-the-API" stance).

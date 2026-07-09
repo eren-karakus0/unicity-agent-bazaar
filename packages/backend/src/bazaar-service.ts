@@ -283,6 +283,12 @@ export class BazaarService {
       throw new Error('mandate caps must be positive');
     }
     if (mandate.expiresAt <= Date.now()) throw new Error('mandate is already expired');
+    // Write-once per id: a leaked mandateId can't be re-registered by a different
+    // buyer to hijack (or inherit the spend counters of) an existing mandate.
+    const existing = this.mandates.get(mandate.mandateId);
+    if (existing && toPrincipal(existing.buyer) !== toPrincipal(mandate.buyer)) {
+      throw new Error('mandateId is already registered to a different buyer');
+    }
     if (!this.verify(canonicalMandate(mandate), signature, signer)) {
       throw new Error('mandate signature does not verify');
     }
@@ -423,8 +429,10 @@ export class BazaarService {
   async testInvoke(listingId: string, caller: Identity, input: unknown): Promise<ServiceResult> {
     const listing = this.listings.get(listingId);
     if (!listing) throw new Error('unknown listing');
+    // Fail closed: only the proven listing owner may test-invoke (this also
+    // gates the SSRF-relevant outbound call behind real ownership).
     const owner = this.listingProviders.get(listingId);
-    if (owner?.chainPubkey && owner.chainPubkey !== caller.chainPubkey) {
+    if (!owner?.chainPubkey || owner.chainPubkey !== caller.chainPubkey) {
       throw new Error('only the listing owner can run a test invocation');
     }
     const invocation: ServiceInvocation = {
@@ -643,10 +651,11 @@ export class BazaarService {
     return job;
   }
 
-  /** Only the job's proven buyer may accept or dispute it. */
+  /** Only the job's proven buyer may accept or dispute it. Fails closed: a
+   *  missing party record or buyer key denies the action rather than allowing it. */
   private assertBuyer(job: EscrowJob, caller: Identity): void {
     const buyer = this.jobParties.get(job.jobId)?.buyer;
-    if (buyer?.chainPubkey && caller.chainPubkey !== buyer.chainPubkey) {
+    if (!buyer?.chainPubkey || caller.chainPubkey !== buyer.chainPubkey) {
       throw new Error('only the buyer can act on this job');
     }
   }
