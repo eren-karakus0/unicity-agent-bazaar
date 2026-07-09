@@ -33,35 +33,6 @@ const BEATS: { step: string; t: string; d: string }[] = [
   { step: 'released', t: 'Released, or refunded', d: 'Accept and the escrow pays the agent, with a signed on-chain receipt. If it fails, your UCT comes back.' },
 ];
 
-// Sticky product showcase: a pinned browser frame whose screen swaps through the
-// real product surfaces as you scroll.
-const SHOTS: { url: string; capT: string; capD: string; screen: () => JSX.Element }[] = [
-  {
-    url: '/marketplace',
-    capT: 'Browse the marketplace',
-    capD: 'Filter live agent services by category, price and trust — every listing hireable in one click.',
-    screen: MarketShot,
-  },
-  {
-    url: '/agent/@scout',
-    capT: 'Vet the provider',
-    capD: 'A 0-100 trust score, tier badge and real reviews — know who you’re hiring before you commit UCT.',
-    screen: ProfileShot,
-  },
-  {
-    url: '/marketplace · escrow',
-    capT: 'Hire into escrow',
-    capD: 'Your UCT locks on-chain and the agent runs. Watch it move quoted → funded → delivered → released.',
-    screen: EscrowShot,
-  },
-  {
-    url: '/marketplace · settled',
-    capT: 'Settle with proof',
-    capD: 'Release on delivery and get a receipt signed by the escrow key, carrying its on-chain txId.',
-    screen: ReceiptShot,
-  },
-];
-
 const vi = (i: number): CSSProperties => ({ ['--i' as string]: i } as CSSProperties);
 const reducedMotion = (): boolean =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -142,41 +113,6 @@ export function Landing({ online }: { online: boolean | null }) {
         .to('.fx-receipt', { autoAlpha: 1, y: 0, duration: 0.5 }, 'release>0.1')
         .to(beats[2]!, { autoAlpha: 0, y: -18, duration: 0.4 }, 'release>0.1')
         .to(beats[3]!, { autoAlpha: 1, y: 0, duration: 0.4 }, '<0.1');
-
-      // — sticky product showcase: swap the framed screen through surfaces —
-      const shots = gsap.utils.toArray<HTMLElement>('.lp-show__shot');
-      const caps = gsap.utils.toArray<HTMLElement>('.lp-show__cap');
-      const urls = gsap.utils.toArray<HTMLElement>('.lp-show__url span');
-      const dots = gsap.utils.toArray<HTMLElement>('.lp-show__dot');
-      if (shots.length) {
-        gsap.set(shots.slice(1), { autoAlpha: 0, yPercent: 6 });
-        gsap.set(caps.slice(1), { autoAlpha: 0, y: 16 });
-        gsap.set(urls.slice(1), { autoAlpha: 0 });
-        const litDot = (i: number) => dots.forEach((d, j) => d.classList.toggle('lp-show__dot--on', j === i));
-        litDot(0);
-
-        const stl = gsap.timeline({
-          defaults: { ease: 'power2.inOut' },
-          scrollTrigger: {
-            trigger: '.lp-show',
-            start: 'top top',
-            end: '+=360%',
-            scrub: 0.7,
-            pin: '.lp-show__stage',
-            anticipatePin: 1,
-            invalidateOnRefresh: true,
-            onUpdate: (self) => litDot(Math.min(shots.length - 1, Math.floor(self.progress * shots.length))),
-          },
-        });
-        for (let i = 1; i < shots.length; i++) {
-          stl.to(shots[i - 1]!, { autoAlpha: 0, yPercent: -6, duration: 0.5 }, '+=0.35')
-            .to(caps[i - 1]!, { autoAlpha: 0, y: -16, duration: 0.5 }, '<')
-            .to(urls[i - 1]!, { autoAlpha: 0, duration: 0.35 }, '<')
-            .to(shots[i]!, { autoAlpha: 1, yPercent: 0, duration: 0.5 }, '<0.15')
-            .to(caps[i]!, { autoAlpha: 1, y: 0, duration: 0.5 }, '<')
-            .to(urls[i]!, { autoAlpha: 1, duration: 0.35 }, '<');
-        }
-      }
 
       // — value props + capabilities: batched scroll reveals —
       ScrollTrigger.batch('.lp-rv', {
@@ -316,8 +252,6 @@ export function Landing({ online }: { online: boolean | null }) {
         </div>
       </section>
 
-      <ProductShowcase />
-
       <section className="wrap lp-sec">
         <div className="lp-props">
           {PROPS.map((p, i) => (
@@ -376,148 +310,6 @@ function LpStat({ n, label, accent }: { n: number; label: string; accent?: boole
         {n.toLocaleString()}
       </span>
       <span className="lp-stat__l">{label}</span>
-    </div>
-  );
-}
-
-/* — sticky product showcase — */
-function ProductShowcase() {
-  return (
-    <section className="lp-show">
-      <div className="lp-show__stage">
-        <div className="wrap lp-show__grid">
-          <div className="lp-show__copy">
-            <span className="lp-show__kick">see it work</span>
-            <h2 className="lp-show__h">The whole loop, in one place</h2>
-            <div className="lp-show__caps">
-              {SHOTS.map((s) => (
-                <div className="lp-show__cap" key={s.capT}>
-                  <div className="lp-show__capt">{s.capT}</div>
-                  <p className="lp-show__capd">{s.capD}</p>
-                </div>
-              ))}
-            </div>
-            <div className="lp-show__dots">
-              {SHOTS.map((s) => (
-                <span className="lp-show__dot" key={s.url} />
-              ))}
-            </div>
-          </div>
-
-          <div className="lp-show__device" aria-hidden>
-            <div className="lp-show__bar">
-              <span className="lp-show__lights">
-                <i /> <i /> <i />
-              </span>
-              <span className="lp-show__url">
-                {SHOTS.map((s) => (
-                  <span key={s.url}>
-                    unicityagentbazaar.vercel.app<b>{s.url}</b>
-                  </span>
-                ))}
-              </span>
-            </div>
-            <div className="lp-show__screen">
-              {SHOTS.map((s) => (
-                <div className="lp-show__shot" key={s.capT}>
-                  {s.screen()}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MarketShot() {
-  const cards = [
-    { tag: 'analysis', title: 'Text Insights', price: 2 },
-    { tag: 'game', title: 'Dice Oracle', price: 1 },
-    { tag: 'data', title: 'Repo Risk Scan', price: 10 },
-  ];
-  return (
-    <div className="sh sh-market">
-      <div className="sh__head">
-        <b>Services</b>
-        <span>3 listed</span>
-      </div>
-      <div className="sh-market__grid">
-        {cards.map((c) => (
-          <div className="sh-card" key={c.title}>
-            <span className="sh-tag">{c.tag}</span>
-            <div className="sh-card__title">{c.title}</div>
-            <div className="sh-card__foot">
-              <span className="sh-price">
-                {c.price} <em>UCT</em>
-              </span>
-              <span className="sh-btn">Hire →</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProfileShot() {
-  return (
-    <div className="sh sh-profile">
-      <div className="sh-profile__top">
-        <span className="sh-badge">◆ GOLD · 86</span>
-        <div>
-          <div className="sh-profile__name">@scout</div>
-          <div className="sh-stars">★★★★★ <span>4.9 · 128 jobs</span></div>
-        </div>
-      </div>
-      <div className="sh-profile__rows">
-        {['Text Insights — 2 UCT', 'Repo Risk Scan — 10 UCT'].map((r) => (
-          <div className="sh-row" key={r}>
-            {r}
-            <span className="sh-mini-verified">✓ verified</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EscrowShot() {
-  const steps = ['quoted', 'funded', 'delivered', 'released'];
-  return (
-    <div className="sh sh-escrow">
-      <div className="sh__head">
-        <b>Hire · Text Insights</b>
-        <span>2 UCT</span>
-      </div>
-      <div className="sh-steps">
-        {steps.map((s, i) => (
-          <span className={`sh-step${i <= 1 ? ' sh-step--on' : ''}`} key={s}>
-            <i />
-            {s}
-          </span>
-        ))}
-      </div>
-      <div className="sh-escrow__pay">Pay 2 UCT with wallet</div>
-      <div className="sh-escrow__hint">funds held in on-chain escrow until delivery</div>
-    </div>
-  );
-}
-
-function ReceiptShot() {
-  return (
-    <div className="sh sh-receipt">
-      <div className="sh-receipt__h">⛓ settlement receipt</div>
-      <div className="sh-receipt__grid">
-        <span>outcome</span>
-        <b>released to provider</b>
-        <span>amount</span>
-        <b>2 UCT</b>
-        <span>on-chain tx</span>
-        <b>0x9f3c…a41b</b>
-      </div>
-      <div className="sh-receipt__ok">✓ signature verified</div>
     </div>
   );
 }
