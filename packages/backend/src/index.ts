@@ -89,8 +89,17 @@ async function boot(): Promise<void> {
     log.info(`restored marketplace state (${restored.listings?.length ?? 0} listings, ${restored.jobs?.length ?? 0} jobs)`);
   }
   const svcRef = service;
+  // Only write when the snapshot actually changed. During idle periods this
+  // means zero writes, so the Postgres (Neon) instance can auto-suspend instead
+  // of being pinned awake by a fixed 10s write - keeps free-tier compute low.
+  let lastSaved = '';
   setInterval(() => {
-    void store.save(svcRef.snapshot());
+    void (async () => {
+      const snap = svcRef.snapshot();
+      const json = JSON.stringify(snap);
+      if (json === lastSaved) return;
+      if (await store.save(snap)) lastSaved = json;
+    })();
   }, 10_000);
 
   // First-party "house" agents: keep the marketplace live + dogfood the signed
