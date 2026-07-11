@@ -25,6 +25,10 @@ export interface BazaarEnv {
   autoReleaseMs: number;
   /** Absolute path to <repoRoot>/data. */
   dataRoot: string;
+  /** Postgres connection string. When set, marketplace state persists to the
+   *  database (durable across restarts/redeploys); otherwise it falls back to a
+   *  JSON file under dataRoot. */
+  databaseUrl?: string;
   /** Auth: HMAC secret for session tokens, login lifetime, dispute operators. */
   auth: {
     sessionSecret: string;
@@ -83,6 +87,7 @@ export function loadEnv(): BazaarEnv {
     port: Number(clean(process.env.PORT) ?? clean(process.env.BACKEND_PORT) ?? '4600'),
     autoReleaseMs: Math.max(1, autoReleaseMin) * 60_000,
     dataRoot: path.join(repoRoot, 'data'),
+    databaseUrl: clean(process.env.DATABASE_URL),
     auth: {
       sessionSecret,
       sessionTtlMs: Math.max(5, sessionTtlMin) * 60_000,

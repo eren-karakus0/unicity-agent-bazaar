@@ -27,7 +27,7 @@ import { startHouseAgents } from './house-agents.js';
 import { renderBadge } from './badge.js';
 import { buildAgentCard } from './agent-card.js';
 import { MarketBridge } from './market-bridge.js';
-import { loadSnapshot, saveSnapshot } from './persist.js';
+import { createSnapshotStore } from './store.js';
 
 const env = loadEnv();
 const log = createLogger('backend');
@@ -76,14 +76,22 @@ async function boot(): Promise<void> {
     logger: createLogger('bazaar'),
   });
 
-  // Restore prior marketplace state, then persist periodically + on shutdown.
-  const restored = loadSnapshot<BazaarSnapshot>(snapshotFile);
+  // Durable persistence: Postgres when DATABASE_URL is set, else a JSON file.
+  const store = await createSnapshotStore<BazaarSnapshot>({
+    databaseUrl: env.databaseUrl,
+    file: snapshotFile,
+    logger: createLogger('persist'),
+  });
+  log.info(`persistence backend: ${store.kind}`);
+  const restored = await store.load();
   if (restored) {
     service.restore(restored);
     log.info(`restored marketplace state (${restored.listings?.length ?? 0} listings, ${restored.jobs?.length ?? 0} jobs)`);
   }
   const svcRef = service;
-  setInterval(() => saveSnapshot(snapshotFile, svcRef.snapshot()), 10_000);
+  setInterval(() => {
+    void store.save(svcRef.snapshot());
+  }, 10_000);
 
   // First-party "house" agents: keep the marketplace live + dogfood the signed
   // webhook path on every boot. Loopback-only, settled back to the escrow wallet.
@@ -96,8 +104,12 @@ async function boot(): Promise<void> {
   });
 
   const persistAndExit = () => {
-    saveSnapshot(snapshotFile, svcRef.snapshot());
-    void house.stop().finally(() => process.exit(0));
+    void (async () => {
+      await store.save(svcRef.snapshot());
+      await store.close();
+      await house.stop().catch(() => undefined);
+      process.exit(0);
+    })();
   };
   process.once('SIGTERM', persistAndExit);
   process.once('SIGINT', persistAndExit);
