@@ -122,12 +122,16 @@ html.lenis body {
 .hdr__in {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 66px;
-  transition: height 0.3s ease;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  /* wider than the body column so the full bar (brand + net + nav + account)
+     spreads across the viewport and never has to squeeze onto two lines */
+  max-width: 1320px;
+  min-height: 66px;
+  transition: min-height 0.3s ease;
 }
 .hdr--scrolled .hdr__in {
-  height: 56px;
+  min-height: 56px;
 }
 .brand {
   display: flex;
@@ -173,6 +177,7 @@ html.lenis body {
   letter-spacing: 0.06em;
   line-height: 1;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 .brand__name em {
   color: var(--brand-orange);
@@ -190,6 +195,7 @@ html.lenis body {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 3px 10px;
+  white-space: nowrap;
   transition:
     color 0.3s ease,
     border-color 0.3s ease;
@@ -248,6 +254,7 @@ html.lenis body {
   border: 1px solid transparent;
   cursor: pointer;
   background: none;
+  white-space: nowrap;
   transition: 0.16s;
 }
 .navlink:hover {
