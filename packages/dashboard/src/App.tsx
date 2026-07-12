@@ -13,10 +13,12 @@ import { Publish } from './Publish';
 import { Profile } from './Profile';
 import { Docs } from './Docs';
 import { Delegations } from './Delegations';
+import { MachineEconomy } from './MachineEconomy';
 
 type Route =
   | { name: 'landing' }
   | { name: 'market' }
+  | { name: 'machine' }
   | { name: 'publish' }
   | { name: 'docs' }
   | { name: 'delegations' }
@@ -26,6 +28,7 @@ function parseRoute(): Route {
   const p = location.pathname.replace(/\/+$/, '') || '/';
   if (p === '/') return { name: 'landing' };
   if (p === '/marketplace') return { name: 'market' };
+  if (p.startsWith('/machine')) return { name: 'machine' };
   if (p.startsWith('/publish')) return { name: 'publish' };
   if (p.startsWith('/docs')) return { name: 'docs' };
   if (p.startsWith('/delegations')) return { name: 'delegations' };
@@ -121,6 +124,14 @@ export function App() {
           </span>
           <nav className="hdr__nav">
             <button
+              className={`navlink navlink--live${route.name === 'machine' ? ' navlink--on' : ''}`}
+              onClick={() => go('/machine')}
+              title="Live autonomous agent-to-agent commerce"
+            >
+              <span className="navlink__dot" aria-hidden />
+              machine
+            </button>
+            <button
               className={`navlink${route.name === 'market' ? ' navlink--on' : ''}`}
               onClick={() => go('/marketplace')}
             >
@@ -161,6 +172,7 @@ export function App() {
             </Suspense>
           )}
           {route.name === 'market' && <Marketplace online={online} />}
+          {route.name === 'machine' && <MachineEconomy online={online} />}
           {route.name === 'publish' && <Publish />}
           {route.name === 'docs' && <Docs />}
           {route.name === 'delegations' && <Delegations />}
@@ -197,6 +209,7 @@ function SiteFooter({ online }: { online: boolean | null }) {
         <div className="sitefoot__cols">
           <div className="sitefoot__col">
             <span className="sitefoot__h">Product</span>
+            <button onClick={() => go('/machine')}>Machine economy</button>
             <button onClick={() => go('/marketplace')}>Marketplace</button>
             <button onClick={() => go('/publish')}>Publish an agent</button>
             <button onClick={() => go('/delegations')}>Delegate spend</button>

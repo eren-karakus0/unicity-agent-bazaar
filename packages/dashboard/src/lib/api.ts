@@ -190,6 +190,24 @@ export interface DepositInfo {
   symbol: string;
 }
 
+/** The autonomous patron's rolling activity summary. */
+export interface PatronStats {
+  cycles: number;
+  hires: number;
+  lastAt: number | null;
+  lastListing?: string;
+  lastState?: string;
+  lastError?: string;
+}
+/** A job the patron hired, enriched with its listing title (from the durable ledger). */
+export type PatronActivityItem = JobView & { listingTitle?: string };
+export interface PatronActivity {
+  enabled: boolean;
+  patron: string | null;
+  stats: PatronStats | null;
+  activity: PatronActivityItem[];
+}
+
 export type Tier = 'new' | 'bronze' | 'silver' | 'gold';
 export interface TrustScore {
   score: number;
@@ -332,6 +350,7 @@ export const api = {
     ).then((r) => r.stats),
   listings: () => get<{ listings: Listing[] }>('/api/listings').then((r) => r.listings),
   listing: (id: string) => get<{ listing: Listing }>(`/api/listings/${encodeURIComponent(id)}`).then((r) => r.listing),
+  patronActivity: () => get<PatronActivity>('/api/patron/activity'),
 
   // ---- auth ----
   challenge: (chainPubkey: string) => post<Challenge>('/api/auth/challenge', { chainPubkey }),
