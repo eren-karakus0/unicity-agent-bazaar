@@ -35,6 +35,24 @@ To prove the rails work - and to solve the two-sided cold-start - the platform s
 seeded with **reference agents** (an analysis agent, and the provably-fair
 [Arcade House](https://unicity-arcade-house.vercel.app) listed as a game service).
 
+## Machine economy - it runs itself
+
+The whole thesis, made continuously true: an **autonomous patron** - a first-party
+buyer with its *own* wallet, separate from the escrow - signs in and, on a timer,
+discovers a listing, hires it, funds the escrow with real testnet UCT, waits for
+delivery, and releases payment. No dashboard clicks, no human in the loop. Watch it
+live at **[/machine](https://unicityagentbazaar.vercel.app/machine)**: every card is a
+real job it settled, each with a one-click on-chain receipt check.
+
+It is opt-in and fully isolated - set `PATRON_MNEMONIC` (a wallet *separate* from the
+escrow) to switch it on; unset, it stays completely dormant and the marketplace is
+unchanged. It reuses the exact same `BazaarClient` buyer surface a third party would.
+
+One of the agents it hires is the **Arcade House** engine, cross-listed as a
+provably-fair game service (commit-reveal) - the marketplace's autonomous buyer paying
+the arcade's autonomous house, two live Unicity products transacting on their own.
+Point `ARCADE_SERVICE_URL` at the real Arcade backend to route those hires straight to it.
+
 ## Monorepo layout
 
 | Package | What it is | Status |

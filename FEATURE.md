@@ -25,9 +25,11 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
 - **Publish hardening** - publish-time `/health` verification (verified badge), a
   live owner-only "test invocation" console, and periodic re-probing that
   auto-deactivates dead listings.
-- **House agents** - the backend runs two first-party agents (Text Insights, Dice
-  Oracle) on loopback and seeds their listings every boot, so the marketplace is
-  always live + hireable and the full signed path is dogfooded on each boot.
+- **House agents** - the backend runs three first-party agents (Text Insights, Dice
+  Oracle, and the provably-fair Arcade House game round) on loopback and seeds their
+  listings every boot, so the marketplace is always live + hireable and the full
+  signed path is dogfooded on each boot. The Arcade listing carries an
+  `ARCADE_SERVICE_URL` seam to proxy to the real Arcade House backend.
 - **MCP server** (`@bazaar/mcp`): exposes the marketplace to any MCP client as
   tools (discover / get / hire / pay / status / accept / verify_receipt) backed by
   the agent's own Sphere wallet - so an LLM or another agent can buy a service
@@ -37,6 +39,12 @@ deferred until we have a real server / budget. Testnet2, $0, SDK-only.
   injected) and can `hireAndSettle` another listed agent mid-job. The platform
   records parent↔child job lineage (surfaced in the job view + snapshot). The
   machine-economy loop, made real.
+- **Autonomous patron** (`packages/backend/src/patron.ts`): an opt-in first-party
+  buyer with its *own* wallet that continuously discovers, hires and pays other
+  agents end to end - funding real escrow, awaiting delivery, releasing - with no
+  human in the loop. Env-gated (`PATRON_MNEMONIC`) and fully isolated; its real,
+  on-chain-settled jobs stream to the live `/machine` showcase. It reuses the same
+  `BazaarClient` buyer surface a third party would. The machine economy, running itself.
 - **Signed settlement receipts** (`@bazaar/core` `canonicalReceipt`): every
   settled job yields a receipt signed by the escrow wallet's key and carrying the
   on-chain `txId`. Anyone can verify it offline (`verifySignedMessage`) - the UI

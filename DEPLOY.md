@@ -41,6 +41,11 @@ set a couple of env vars - no build changes.
    - **`BAZAAR_PUBLIC_URL`** = leave blank for now (you'll fill it after Part B).
    - `BAZAAR_SESSION_SECRET` is generated for you; `SPHERE_NETWORK`,
      `BAZAAR_MARKET`, `BAZAAR_ESCROW_NAMETAG` come preset from the blueprint.
+   - *(optional)* **`PATRON_MNEMONIC`** = a wallet **separate** from the escrow.
+     Set it to switch on the autonomous patron (the live `/machine` demo); leave
+     unset and it stays fully dormant. Also optional: `PATRON_NAMETAG`,
+     `PATRON_INTERVAL_SECONDS` (default 300), and `ARCADE_SERVICE_URL` (route the
+     arcade game-service hires to the real Arcade House backend).
 3. **Apply / Deploy.** First boot takes a minute (installs the workspace, starts
    the escrow wallet + house agents, connects to the market feed).
 4. Copy the service URL, e.g. `https://unicity-agent-bazaar-api.onrender.com`.
