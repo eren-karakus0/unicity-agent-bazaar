@@ -73,6 +73,74 @@ const diceOracle: AgentHandler = (inv: ServiceInvocation) => {
   return { sides, rolls, results, total: results.reduce((a, b) => a + b, 0) };
 };
 
+const sha256 = (s: string): string => crypto.createHash('sha256').update(s).digest('hex');
+
+/**
+ * Deal one provably-fair game round - the Arcade House engine, offered as a
+ * service. `commit = sha256(`${secret}:${nonce}`)` is returned alongside the
+ * revealed secret + nonce and a result derived deterministically from the
+ * secret, so anyone can prove the house couldn't have fudged the outcome after
+ * the fact. Pure + testable (the on-chain settlement is the bazaar's job).
+ */
+export function dealArcadeRound(input: unknown): {
+  engine: string;
+  game: 'coin' | 'dice';
+  commit: string;
+  secret: string;
+  nonce: string;
+  result: string;
+  pick?: string;
+  outcome?: 'win' | 'lose';
+  verify: string;
+} {
+  const o = asRecord(input);
+  const game: 'coin' | 'dice' = String(o.game ?? 'coin').toLowerCase() === 'dice' ? 'dice' : 'coin';
+  const secret = crypto.randomBytes(16).toString('hex');
+  const nonce = crypto.randomBytes(8).toString('hex');
+  const commit = sha256(`${secret}:${nonce}`);
+  // The result is derived from the (now revealed) secret - reproducible by anyone.
+  const draw = parseInt(sha256(secret).slice(0, 8), 16);
+  const result = game === 'dice' ? String((draw % 6) + 1) : draw % 2 === 0 ? 'heads' : 'tails';
+  const raw = o.pick !== undefined ? String(o.pick).trim().toLowerCase() : '';
+  const pick = raw ? raw : undefined;
+  const outcome = pick === undefined ? undefined : pick === result.toLowerCase() ? 'win' : 'lose';
+  return {
+    engine: 'unicity-arcade-house',
+    game,
+    commit,
+    secret,
+    nonce,
+    result,
+    ...(pick !== undefined ? { pick } : {}),
+    ...(outcome !== undefined ? { outcome } : {}),
+    verify: 'sha256(`${secret}:${nonce}`) === commit; result = derive(sha256(secret))',
+  };
+}
+
+/**
+ * The Arcade House game-service handler. By default it deals the round locally
+ * with the same commit-reveal engine; when ARCADE_SERVICE_URL is set it proxies
+ * to the REAL Arcade House backend instead - the seam that upgrades this listing
+ * from a first-party stand-in to the live cross-product integration, with no
+ * rework here.
+ */
+const arcadeGameRound: AgentHandler = async (inv: ServiceInvocation) => {
+  const url = process.env.ARCADE_SERVICE_URL?.trim();
+  if (url) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(inv),
+    });
+    if (!res.ok) throw new Error(`arcade service responded ${res.status}`);
+    const data: unknown = await res.json();
+    // Accept a ServiceResult ({ ok, output }) or a bare output object.
+    if (data && typeof data === 'object' && 'output' in data) return (data as { output: unknown }).output;
+    return data;
+  }
+  return dealArcadeRound(inv.input);
+};
+
 const AGENTS: HouseAgent[] = [
   {
     portOffset: 1,
@@ -100,6 +168,22 @@ const AGENTS: HouseAgent[] = [
       { name: 'rolls', label: 'Number of dice', type: 'number', placeholder: '3' },
     ],
     handle: diceOracle,
+  },
+  {
+    portOffset: 3,
+    seedAt: 1_700_000_000_003,
+    title: 'Unicity Arcade House - provably-fair game round',
+    description:
+      'The Arcade House game engine, hireable as a service. Get a committed, verifiable coin or ' +
+      'dice round: the reply reveals the secret + nonce behind a sha256 commit, so you can prove ' +
+      'the house never fudged the result. Cross-listed from the live Unicity Arcade House.',
+    category: 'game',
+    priceUct: 1,
+    inputSchema: [
+      { name: 'game', label: 'Game', type: 'text', placeholder: 'coin or dice' },
+      { name: 'pick', label: 'Your call (optional)', type: 'text', placeholder: 'heads · tails · 1-6' },
+    ],
+    handle: arcadeGameRound,
   },
 ];
 

@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BazaarService, type BazaarAgent } from './bazaar-service.js';
 import { createHealthProber, createWebhookInvoker } from './webhook-client.js';
-import { startHouseAgents, type HouseAgentsHandle } from './house-agents.js';
+import { startHouseAgents, dealArcadeRound, type HouseAgentsHandle } from './house-agents.js';
 import type { Identity } from './auth.js';
 
 // A minimal escrow stub: 2-decimal UCT, records nothing we assert here.
@@ -36,13 +37,14 @@ describe('house agents (real signed loopback path)', () => {
     return svc;
   };
 
-  it('seeds two verified, hireable listings', async () => {
+  it('seeds three verified, hireable listings', async () => {
     const svc = await boot();
     const listings = svc.listingsDecorated();
-    expect(listings).toHaveLength(2);
-    // Both answered a real loopback /health probe → verified.
+    expect(listings).toHaveLength(3);
+    // All answered a real loopback /health probe → verified.
     expect(listings.every((l) => l.verified)).toBe(true);
-    expect(listings.map((l) => l.agentNametag)).toEqual(['@bazaar-labs', '@bazaar-labs']);
+    expect(listings.every((l) => l.agentNametag === '@bazaar-labs')).toBe(true);
+    expect(listings.some((l) => l.title.includes('Arcade House'))).toBe(true);
   });
 
   it('delivers a job through the signed webhook end-to-end', async () => {
@@ -59,6 +61,24 @@ describe('house agents (real signed loopback path)', () => {
     const output = job.result?.output as { results: number[]; total: number };
     expect(output.results).toHaveLength(3);
     expect(output.total).toBeGreaterThanOrEqual(3);
+  });
+
+  it('deals a verifiable provably-fair round (commit matches secret+nonce)', () => {
+    const round = dealArcadeRound({ game: 'coin' });
+    // Anyone can recompute the commit from the revealed secret + nonce.
+    expect(createHash('sha256').update(`${round.secret}:${round.nonce}`).digest('hex')).toBe(round.commit);
+    // The result is deterministically derived from the revealed secret.
+    const draw = parseInt(createHash('sha256').update(round.secret).digest('hex').slice(0, 8), 16);
+    expect(round.result).toBe(draw % 2 === 0 ? 'heads' : 'tails');
+    expect(round.game).toBe('coin');
+    expect(round.outcome).toBeUndefined(); // no pick → no win/lose
+  });
+
+  it('judges a caller pick against the fair result', () => {
+    const round = dealArcadeRound({ game: 'dice', pick: '3' });
+    expect(round.game).toBe('dice');
+    expect(['1', '2', '3', '4', '5', '6']).toContain(round.result);
+    expect(round.outcome).toBe(round.pick === round.result ? 'win' : 'lose');
   });
 
   it('rejects an unsigned call to the agent port with 401', async () => {
