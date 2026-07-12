@@ -37,6 +37,10 @@ export interface BazaarEnv {
     /** Chain pubkeys allowed to resolve disputes (empty = dispute resolution disabled). */
     operators: string[];
   };
+  /** Optional autonomous "patron" buyer: a distinct wallet that continuously
+   *  discovers, hires and pays other agents (the machine-economy demo). Present
+   *  only when PATRON_MNEMONIC is set; absent = the patron is fully disabled. */
+  patron?: { mnemonic: string; nametag: string; intervalMs: number };
 }
 
 /** Walk up from `start` until a directory containing pnpm-workspace.yaml is found. */
@@ -73,6 +77,10 @@ export function loadEnv(): BazaarEnv {
     .map((s) => s.trim().toLowerCase())
     .filter((s) => /^0[23][0-9a-f]{64}$/.test(s));
 
+  // Autonomous patron: opt-in via PATRON_MNEMONIC (a wallet SEPARATE from escrow).
+  const patronMnemonic = clean(process.env.PATRON_MNEMONIC);
+  const patronIntervalSec = Math.max(30, Number(clean(process.env.PATRON_INTERVAL_SECONDS) ?? '300'));
+
   return {
     network: (clean(process.env.SPHERE_NETWORK) as NetworkType) ?? 'testnet2',
     oracleApiKey: clean(process.env.SPHERE_ORACLE_API_KEY) ?? PUBLIC_TESTNET2_KEY,
@@ -94,5 +102,14 @@ export function loadEnv(): BazaarEnv {
       secretIsEphemeral: !configuredSecret,
       operators,
     },
+    ...(patronMnemonic
+      ? {
+          patron: {
+            mnemonic: patronMnemonic,
+            nametag: clean(process.env.PATRON_NAMETAG) ?? 'patron-knkchn',
+            intervalMs: patronIntervalSec * 1000,
+          },
+        }
+      : {}),
   };
 }

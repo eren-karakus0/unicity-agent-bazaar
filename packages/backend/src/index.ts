@@ -27,6 +27,7 @@ import { startHouseAgents } from './house-agents.js';
 import { renderBadge } from './badge.js';
 import { buildAgentCard } from './agent-card.js';
 import { MarketBridge } from './market-bridge.js';
+import { AutonomousPatron } from './patron.js';
 import { createSnapshotStore } from './store.js';
 
 const env = loadEnv();
@@ -58,6 +59,7 @@ const escrowAgent = new SphereAgent({
 
 let service: BazaarService | null = null;
 let market: MarketBridge | null = null;
+let patron: AutonomousPatron | null = null;
 let ready = false;
 
 const snapshotFile = path.join(env.dataRoot, 'bazaar-state.json');
@@ -117,6 +119,7 @@ async function boot(): Promise<void> {
       await store.save(svcRef.snapshot());
       await store.close();
       await house.stop().catch(() => undefined);
+      await patron?.stop().catch(() => undefined);
       process.exit(0);
     })();
   };
@@ -183,6 +186,28 @@ async function boot(): Promise<void> {
 
   ready = true;
   log.info(`bazaar online - escrow @${escrowAgent.nametag}`);
+
+  // Autonomous patron (opt-in): a distinct wallet that continuously discovers,
+  // hires and pays other agents - the machine economy, running with no human in
+  // the loop. Started fire-and-forget so a slow wallet init never blocks boot,
+  // and fully isolated so any failure leaves the marketplace untouched.
+  if (env.patron) {
+    patron = new AutonomousPatron({
+      mnemonic: env.patron.mnemonic,
+      nametag: env.patron.nametag,
+      intervalMs: env.patron.intervalMs,
+      baseUrl: `http://127.0.0.1:${env.port}`,
+      dataDir: env.dataRoot,
+      network: env.network,
+      oracleApiKey: env.oracleApiKey,
+      walletApiUrl: env.walletApiUrl,
+      logger: createLogger('patron'),
+    });
+    patron.start().catch((e) => {
+      log.warn('patron failed to start (marketplace unaffected):', e instanceof Error ? e.message : e);
+      patron = null;
+    });
+  }
 }
 
 // ---- http helpers ----
@@ -338,6 +363,20 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/api/stats' && method === 'GET') {
     json(res, 200, { stats: svc.platformStats() });
+    return;
+  }
+
+  // The autonomous patron's live activity: real jobs it hired + paid on-chain,
+  // with no human in the loop. `activity` is read straight from the durable job
+  // ledger (buyer = the patron), so it is never a cosmetic feed.
+  if (pathname === '/api/patron/activity' && method === 'GET') {
+    const activity = patron?.principal ? svc.recentJobsByBuyer(patron.principal, 20) : [];
+    json(res, 200, {
+      enabled: !!patron,
+      patron: patron?.principal ?? null,
+      stats: patron?.stats() ?? null,
+      activity,
+    });
     return;
   }
 

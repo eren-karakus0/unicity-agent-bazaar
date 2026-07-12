@@ -779,6 +779,25 @@ export class BazaarService {
     return reputationView(this.reputations.get(key) ?? newReputation(key));
   }
 
+  /**
+   * Recent jobs where `principal` was the buyer, newest first, each enriched with
+   * its listing title. The single source of truth for the autonomous-patron
+   * showcase: these are real, durable jobs with real on-chain settlement (not a
+   * separate cosmetic feed).
+   */
+  recentJobsByBuyer(principal: string, limit = 20): (JobView & { listingTitle?: string })[] {
+    const key = toPrincipal(principal);
+    return [...this.jobs.values()]
+      .filter((j) => j.buyerNametag === key)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, Math.max(0, limit))
+      .map((j) => {
+        const view = this.getJob(j.jobId)!;
+        const listing = this.listings.get(j.listingId);
+        return { ...view, ...(listing ? { listingTitle: listing.title } : {}) };
+      });
+  }
+
   /** A provider's synthesized 0-100 trust score + tier (reputation + verified). */
   trustOf(principal: string): TrustScore {
     const key = toPrincipal(principal);
