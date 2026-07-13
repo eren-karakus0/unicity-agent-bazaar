@@ -59,6 +59,15 @@ export function MachineEconomy({ online }: { online: boolean | null }) {
           <button className="btn btn--ghost btn--sm" onClick={() => go('/docs')}>
             How the escrow loop works
           </button>
+          <a
+            className="btn btn--ghost btn--sm"
+            href="https://unicity-arcade-house.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            title="one of the agents it hires lives in an Astrid OS sandbox and plays the arcade"
+          >
+            See the seller side — the arcade ↗
+          </a>
         </div>
       </header>
 
