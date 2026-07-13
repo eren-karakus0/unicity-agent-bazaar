@@ -152,6 +152,9 @@ export interface BazaarServiceOptions {
   invoke: Invoker;
   /** Probes a provider endpoint's `/health` (defaults to a real HTTP prober). */
   probe?: HealthProber;
+  /** Liveness check for `kind: 'capsule'` listings (capsules poll, they are
+   *  not probed) - absent, capsule listings simply stay unverified. */
+  capsuleHealth?: (ref: string) => { ok: boolean; detail?: string };
   /** How long a delivered job waits before auto-releasing to the provider. */
   autoReleaseMs?: number;
   /** Verify a secp256k1 signed message (for spending mandates). Absent → mandates disabled. */
@@ -204,6 +207,7 @@ export class BazaarService {
   private readonly agent: BazaarAgent;
   private readonly invoke: Invoker;
   private readonly probe: HealthProber;
+  private readonly capsuleHealth?: (ref: string) => { ok: boolean; detail?: string };
   private readonly autoReleaseMs: number;
   private readonly verify?: (message: string, signature: string, pubkey: string) => boolean;
   private readonly log: Logger;
@@ -257,6 +261,7 @@ export class BazaarService {
     this.agent = opts.agent;
     this.invoke = opts.invoke;
     this.probe = opts.probe ?? createHealthProber();
+    if (opts.capsuleHealth) this.capsuleHealth = opts.capsuleHealth;
     this.autoReleaseMs = opts.autoReleaseMs ?? 2 * 60_000;
     this.verify = opts.verify;
     this.log = opts.logger ?? createLogger('bazaar');
@@ -382,8 +387,11 @@ export class BazaarService {
     let probe: { ok: boolean; detail?: string };
     if (listing.channel.kind === 'webhook') {
       probe = await this.probe(healthUrlOf(listing.channel.url));
+    } else if (this.capsuleHealth) {
+      // Capsules poll their inbox; recency of that poll IS the health signal.
+      probe = this.capsuleHealth(listing.channel.ref);
     } else {
-      probe = { ok: false, detail: 'capsule endpoints are not health-probed yet' };
+      probe = { ok: false, detail: 'capsule liveness tracking is not enabled on this server' };
     }
     const health: ListingHealth = {
       ok: probe.ok,
@@ -395,15 +403,19 @@ export class BazaarService {
   }
 
   /**
-   * Re-probe every active webhook listing and auto-deactivate any that fails a
-   * few checks in a row - so a dead endpoint stops taking hires. A single
-   * recovery resets the count. House (loopback) agents stay up.
+   * Re-probe every active listing. Webhook listings that fail a few checks in
+   * a row auto-deactivate - a dead endpoint stops taking hires (a single
+   * recovery resets the count; house/loopback agents stay up). Capsule
+   * listings only refresh their liveness badge: they go offline whenever
+   * their host kernel sleeps and come back on their own, and a hire while
+   * offline refunds honestly via the hub timeout - no need to delist.
    */
   async sweepListingHealth(strikesToDeactivate = 3): Promise<void> {
-    const active = [...this.listings.values()].filter((l) => l.active && l.channel.kind === 'webhook');
+    const active = [...this.listings.values()].filter((l) => l.active);
     await Promise.all(
       active.map(async (l) => {
         const health = await this.verifyListingHealth(l.id);
+        if (l.channel.kind !== 'webhook') return; // liveness refresh only
         if (health.ok) {
           this.healthStrikes.delete(l.id);
           return;

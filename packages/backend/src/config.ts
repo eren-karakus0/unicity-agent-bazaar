@@ -41,6 +41,10 @@ export interface BazaarEnv {
    *  discovers, hires and pays other agents (the machine-economy demo). Present
    *  only when PATRON_MNEMONIC is set; absent = the patron is fully disabled. */
   patron?: { mnemonic: string; nametag: string; intervalMs: number };
+  /** Shared secret for the Astrid capsule provider's inbox/result endpoints
+   *  (ARCADE_CAPSULE_SECRET). Absent = the capsule channel stays disabled and
+   *  no capsule listing is seeded. */
+  capsuleSecret?: string;
 }
 
 /** Walk up from `start` until a directory containing pnpm-workspace.yaml is found. */
@@ -110,6 +114,9 @@ export function loadEnv(): BazaarEnv {
             intervalMs: patronIntervalSec * 1000,
           },
         }
+      : {}),
+    ...(clean(process.env.ARCADE_CAPSULE_SECRET)
+      ? { capsuleSecret: clean(process.env.ARCADE_CAPSULE_SECRET) }
       : {}),
   };
 }

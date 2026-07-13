@@ -16,7 +16,8 @@
 import http from 'node:http';
 import path from 'node:path';
 import { verifySignedMessage } from '@unicitylabs/sphere-sdk';
-import { canonicalReceipt, type InputField, type SettlementReceipt } from '@bazaar/core';
+import { canonicalReceipt, makeListing, type InputField, type SettlementReceipt } from '@bazaar/core';
+import { CapsuleHub } from './capsule-hub.js';
 import { loadEnv } from './config.js';
 import { createLogger } from './logger.js';
 import { SphereAgent } from './sphere-agent.js';
@@ -60,6 +61,12 @@ const escrowAgent = new SphereAgent({
 let service: BazaarService | null = null;
 let market: MarketBridge | null = null;
 let patron: AutonomousPatron | null = null;
+// The capsule mailbox (kind:'capsule' listings). Enabled only when the shared
+// secret env is set; the capsule provider polls it from inside its sandbox.
+const capsuleHub = env.capsuleSecret
+  ? new CapsuleHub({ secret: env.capsuleSecret, logger: createLogger('capsule-hub') })
+  : null;
+const CAPSULE_REF = 'arcade-player';
 let ready = false;
 
 const snapshotFile = path.join(env.dataRoot, 'bazaar-state.json');
@@ -69,10 +76,17 @@ async function boot(): Promise<void> {
   // First-party loopback agents register their origin here so the SSRF guard
   // permits them while still blocking user-supplied private/loopback URLs.
   const trustedHosts = new Set<string>();
+  // Webhook listings get POSTed to; capsule listings park in the hub until
+  // the sandboxed provider polls its inbox (capsules cannot receive pushes).
+  const webhookInvoke = createWebhookInvoker({ timeoutMs: 20_000, allowHosts: trustedHosts });
   service = new BazaarService({
     agent: escrowAgent,
-    invoke: createWebhookInvoker({ timeoutMs: 20_000, allowHosts: trustedHosts }),
+    invoke: (channel, invocation, secret) =>
+      channel.kind === 'capsule' && capsuleHub
+        ? capsuleHub.enqueue(channel.ref, invocation)
+        : webhookInvoke(channel, invocation, secret),
     probe: createHealthProber({ timeoutMs: 5_000, allowHosts: trustedHosts }),
+    ...(capsuleHub ? { capsuleHealth: (ref: string) => capsuleHub.health(ref) } : {}),
     autoReleaseMs: env.autoReleaseMs,
     verify: verifySignedMessage,
     logger: createLogger('bazaar'),
@@ -113,6 +127,40 @@ async function boot(): Promise<void> {
     logger: createLogger('house'),
     trustedHosts,
   });
+
+  // The Astrid capsule provider: the first REAL kind:'capsule' listing. Its
+  // work runs INSIDE an Astrid OS WASM sandbox on a separate machine - the
+  // capsule polls /api/capsule/inbox, plays a provably-fair round at the live
+  // Arcade House, verifies the reveal in-sandbox, and posts the result back.
+  // Verified badge = inbox-poll liveness; offline capsule -> hire refunds.
+  if (capsuleHub && escrowAgent.chainPubkey && env.capsuleSecret) {
+    const capsuleListing = makeListing(
+      {
+        agentNametag: '@astrid-arcade',
+        title: 'Arcade Oracle - a provably-fair game round from an Astrid OS sandbox',
+        description:
+          'Hire an agent that lives inside an Astrid OS WASM microkernel sandbox. It plays one ' +
+          'provably-fair round at the live Unicity Arcade House with real testnet UCT, re-verifies ' +
+          'the commit-reveal with its own in-sandbox SHA-256, and returns the full round report. ' +
+          'Delivered over the capsule channel: the sandbox polls for work - nothing can push into it.',
+        category: 'game',
+        priceUct: 2,
+        channel: { kind: 'capsule', ref: CAPSULE_REF },
+        inputSchema: [
+          { name: 'game', label: 'Game', type: 'text', placeholder: 'rps · wheel · plinko · dice · coin · highlow · number (random when empty)' },
+          { name: 'bet', label: 'Bet (UCT chips)', type: 'number', placeholder: '1' },
+        ],
+      },
+      1_700_000_000_004,
+    );
+    service.seedListing(
+      capsuleListing,
+      { chainPubkey: escrowAgent.chainPubkey, nametag: 'astrid-arcade' },
+      env.capsuleSecret,
+    );
+    void service.verifyListingHealth(capsuleListing.id);
+    log.info(`capsule listing live: ${capsuleListing.slug} (ref ${CAPSULE_REF})`);
+  }
 
   const persistAndExit = () => {
     void (async () => {
@@ -363,6 +411,44 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/api/stats' && method === 'GET') {
     json(res, 200, { stats: svc.platformStats() });
+    return;
+  }
+
+  // ---- the capsule provider's mailbox (kind:'capsule' listings) ----
+  // The sandboxed capsule cannot receive pushes; it polls for leased work and
+  // posts results back. Both calls carry the shared secret header.
+  if (pathname === '/api/capsule/inbox' && method === 'GET') {
+    if (!capsuleHub) {
+      json(res, 503, { error: 'the capsule channel is not enabled on this server' });
+      return;
+    }
+    const presented = req.headers['x-capsule-secret'];
+    if (!capsuleHub.authorized(Array.isArray(presented) ? presented[0] : presented)) {
+      json(res, 401, { error: 'bad capsule secret' });
+      return;
+    }
+    const ref = url.searchParams.get('ref') ?? CAPSULE_REF;
+    json(res, 200, { invocations: capsuleHub.lease(ref) });
+    return;
+  }
+  if (pathname === '/api/capsule/result' && method === 'POST') {
+    if (!capsuleHub) {
+      json(res, 503, { error: 'the capsule channel is not enabled on this server' });
+      return;
+    }
+    const presented = req.headers['x-capsule-secret'];
+    if (!capsuleHub.authorized(Array.isArray(presented) ? presented[0] : presented)) {
+      json(res, 401, { error: 'bad capsule secret' });
+      return;
+    }
+    void readJson(req).then((body) => {
+      const accepted = capsuleHub.complete(str(body.jobId) ?? '', {
+        ok: body.ok === true,
+        output: body.output,
+        ...(str(body.error) ? { error: str(body.error) } : {}),
+      });
+      json(res, accepted ? 200 : 404, { accepted });
+    });
     return;
   }
 
