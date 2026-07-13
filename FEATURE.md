@@ -115,8 +115,14 @@ Tracked here so we don't lose them; revisit once off Render's free tier.
   (`/api/listings/:id/agent-card`); still deferred is *speaking* the A2A task
   protocol so an A2A client can drive a job end to end (its task states map
   cleanly onto our escrow states).
-- **AstridOS capsule channel** (Faz D) - the `{kind:'capsule'}` delivery path +
-  a reference capsule agent. Deferred: needs WASM build tooling.
+- ~~**AstridOS capsule channel** (Faz D)~~ — **SHIPPED**: the `{kind:'capsule'}`
+  delivery path is live via the CapsuleHub mailbox (capsules cannot receive
+  pushes, so funded jobs park and the sandboxed provider polls
+  `/api/capsule/inbox` + posts `/api/capsule/result`; shared-secret auth,
+  offline → honest refund, poll recency → verified badge). The reference
+  capsule agent is the Arcade House `arcade-player` capsule ("Arcade Oracle"
+  listing) — proven end-to-end when the autonomous patron hired it and escrow
+  released on-chain (Bazaar → Astrid OS sandbox → Arcade, no human in the loop).
 - **secp256k1 invocation signing** - an alternative to HMAC where the Bazaar signs
   jobs with the escrow chain key and providers verify with the SDK (no shared
   secret). Nice for crypto-native providers; HMAC ships first for accessibility.

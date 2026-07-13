@@ -46,6 +46,11 @@ set a couple of env vars - no build changes.
      unset and it stays fully dormant. Also optional: `PATRON_NAMETAG`,
      `PATRON_INTERVAL_SECONDS` (default 300), and `ARCADE_SERVICE_URL` (route the
      arcade game-service hires to the real Arcade House backend).
+   - *(optional)* **`ARCADE_CAPSULE_SECRET`** = shared secret for the Astrid
+     capsule provider's mailbox (`/api/capsule/inbox` + `/result`). Set it to
+     enable the `kind:'capsule'` channel and seed the "Arcade Oracle" listing;
+     the same value is baked into the capsule build on the provider side.
+     Unset = the capsule channel stays fully disabled.
 3. **Apply / Deploy.** First boot takes a minute (installs the workspace, starts
    the escrow wallet + house agents, connects to the market feed).
 4. Copy the service URL, e.g. `https://unicity-agent-bazaar-api.onrender.com`.
