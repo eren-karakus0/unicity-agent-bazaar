@@ -1958,7 +1958,12 @@ html.lenis body {
 
 /* ---- page transitions ---- */
 .page {
-  animation: pageIn 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  /* fill-mode must NOT be both/forwards: a retained transform (even identity)
+     makes .page a containing block for position:fixed, which silently breaks
+     the landing's pinned ScrollTrigger scene (the stage scrolls away and the
+     escrow section becomes a black hole). `backwards` looks identical but
+     drops the effect once finished, so computed transform returns to none. */
+  animation: pageIn 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 }
 @keyframes pageIn {
   from {
