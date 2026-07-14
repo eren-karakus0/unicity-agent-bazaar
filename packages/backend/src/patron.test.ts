@@ -78,7 +78,7 @@ describe('AutonomousPatron', () => {
     await patron.bootstrap();
     await patron.runCycle();
     expect(hired).toEqual([{ listingId: 'a', input: expect.objectContaining({ text: expect.any(String) }) }]);
-    expect(patron.stats()).toMatchObject({ cycles: 1, hires: 1, lastState: 'released' });
+    expect(patron.stats()).toMatchObject({ cycles: 1, hires: 1, lastState: 'released', intervalMs: 60_000 });
   });
 
   it('never hires its own listing', async () => {

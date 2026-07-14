@@ -195,6 +195,8 @@ export interface PatronStats {
   cycles: number;
   hires: number;
   lastAt: number | null;
+  /** Optional: older backends don't report it — the heartbeat hides then. */
+  intervalMs?: number;
   lastListing?: string;
   lastState?: string;
   lastError?: string;

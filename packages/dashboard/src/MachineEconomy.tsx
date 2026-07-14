@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { api, type EscrowState, type PatronActivity, type PatronActivityItem } from './lib/api';
 import { go } from './lib/nav';
 
@@ -81,6 +81,7 @@ export function MachineEconomy({ online }: { online: boolean | null }) {
           <MetaStat label="hire cycles" value={String(data.stats?.cycles ?? 0)} />
           <MetaStat label="jobs settled" value={String(data.stats?.hires ?? 0)} />
           <MetaStat label="UCT flowed" value={settledUct.toLocaleString()} accent />
+          <Heartbeat lastAt={data.stats?.lastAt ?? null} intervalMs={data.stats?.intervalMs} />
         </div>
       )}
 
@@ -107,8 +108,8 @@ export function MachineEconomy({ online }: { online: boolean | null }) {
 
       {data?.enabled && data.activity.length > 0 && (
         <div className="me-feed">
-          {data.activity.map((item) => (
-            <JobCard key={item.job.jobId} item={item} />
+          {data.activity.map((item, i) => (
+            <JobCard key={item.job.jobId} item={item} index={i} />
           ))}
         </div>
       )}
@@ -120,19 +121,53 @@ function MetaStat({ label, value, accent, children }: { label: string; value?: s
   return (
     <div className="me-metastat">
       <span className="me-metastat__k">{label}</span>
-      <span className={`me-metastat__v${accent ? ' me-metastat__v--accent' : ''}`}>{children ?? value}</span>
+      {/* key-remount pops the number whenever the live value moves */}
+      <span
+        className={`me-metastat__v${accent ? ' me-metastat__v--accent' : ''}${value !== undefined ? ' me-pop' : ''}`}
+        key={value}
+      >
+        {children ?? value}
+      </span>
     </div>
   );
 }
 
-function JobCard({ item }: { item: PatronActivityItem }) {
+/** Honest ETA to the next autonomous hire — lastAt + the loop's real interval. */
+function Heartbeat({ lastAt, intervalMs }: { lastAt: number | null; intervalMs?: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  if (!intervalMs) return null;
+  const eta = lastAt === null ? null : lastAt + intervalMs - now;
+  const label =
+    eta === null ? 'warming up…' : eta > 1500 ? `in ~${fmtEta(eta)}` : 'any moment now…';
+  return (
+    <div className="me-metastat">
+      <span className="me-metastat__k">next autonomous hire</span>
+      <span className="me-metastat__v me-heartbeat">
+        <span className="me-heartbeat__ring" aria-hidden /> {label}
+      </span>
+    </div>
+  );
+}
+
+function fmtEta(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${String(s % 60).padStart(2, '0')}s`;
+}
+
+function JobCard({ item, index }: { item: PatronActivityItem; index: number }) {
   const { job } = item;
   const terminalRefund = job.state === 'refunded';
   const disputed = job.state === 'disputed';
   const current = STAGE_INDEX[job.state] ?? (terminalRefund ? 1 : 0);
 
   return (
-    <article className="me-job">
+    <article className="me-job me-rise" style={{ '--i': Math.min(index, 8) } as CSSProperties}>
       <div className="me-job__head">
         <div className="me-job__title">{item.listingTitle ?? job.listingId}</div>
         <div className={`me-amount${job.state === 'released' ? ' me-amount--paid' : ''}`}>
@@ -154,6 +189,8 @@ function JobCard({ item }: { item: PatronActivityItem }) {
               key={s.key}
               className={`me-pipe__step${i < current ? ' is-done' : ''}${i === current ? ' is-current' : ''}`}
             >
+              {/* a light travels the segment as it becomes done */}
+              {i > 0 && i <= current && <span className="me-pipe__spark" aria-hidden />}
               <span className="me-pipe__dot" aria-hidden />
               <span className="me-pipe__lbl">{s.label}</span>
             </li>

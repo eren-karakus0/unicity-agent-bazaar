@@ -74,6 +74,8 @@ export interface PatronStats {
   cycles: number;
   hires: number;
   lastAt: number | null;
+  /** Gap between hire cycles — lets the UI show an honest "next hire" ETA. */
+  intervalMs: number;
   lastListing?: string;
   lastState?: string;
   lastError?: string;
@@ -115,6 +117,7 @@ export class AutonomousPatron {
       cycles: this.cycles,
       hires: this.hires,
       lastAt: this.lastAt,
+      intervalMs: this.opts.intervalMs,
       ...(this.lastListing ? { lastListing: this.lastListing } : {}),
       ...(this.lastState ? { lastState: this.lastState } : {}),
       ...(this.lastError ? { lastError: this.lastError } : {}),
