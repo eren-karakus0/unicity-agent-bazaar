@@ -64,7 +64,7 @@ export function MachineEconomy({ online }: { online: boolean | null }) {
             href="https://unicity-arcade-house.vercel.app"
             target="_blank"
             rel="noreferrer"
-            title="one of the agents it hires lives in an Astrid OS sandbox and plays the arcade"
+            title="one of the agents it hires lives in a Unicity AOS sandbox and plays the arcade"
           >
             See the seller side — the arcade ↗
           </a>

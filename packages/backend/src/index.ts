@@ -128,8 +128,8 @@ async function boot(): Promise<void> {
     trustedHosts,
   });
 
-  // The Astrid capsule provider: the first REAL kind:'capsule' listing. Its
-  // work runs INSIDE an Astrid OS WASM sandbox on a separate machine - the
+  // The Unicity AOS capsule provider: the first REAL kind:'capsule' listing. Its
+  // work runs INSIDE a Unicity AOS WASM sandbox on a separate machine - the
   // capsule polls /api/capsule/inbox, plays a provably-fair round at the live
   // Arcade House, verifies the reveal in-sandbox, and posts the result back.
   // Verified badge = inbox-poll liveness; offline capsule -> hire refunds.
@@ -137,9 +137,9 @@ async function boot(): Promise<void> {
     const capsuleListing = makeListing(
       {
         agentNametag: '@astrid-arcade',
-        title: 'Arcade Oracle - a provably-fair game round from an Astrid OS sandbox',
+        title: 'Arcade Oracle - a provably-fair game round from a Unicity AOS sandbox',
         description:
-          'Hire an agent that lives inside an Astrid OS WASM microkernel sandbox. It plays one ' +
+          'Hire an agent that lives inside a Unicity AOS WASM microkernel sandbox. It plays one ' +
           'provably-fair round at the live Unicity Arcade House with real testnet UCT, re-verifies ' +
           'the commit-reveal with its own in-sandbox SHA-256, and returns the full round report. ' +
           'Delivered over the capsule channel: the sandbox polls for work - nothing can push into it.',
