@@ -12,7 +12,7 @@
   "dependencies": {
     "@bazaar/agent-kit": "workspace:*",
     "@bazaar/core": "workspace:*",
-    "@unicitylabs/sphere-sdk": "^0.10.7",
+    "@unicitylabs/sphere-sdk": "^0.12.0",
     "dotenv": "^16.4.7",
     "pg": "^8.13.1",
     "ws": "^8.18.0"

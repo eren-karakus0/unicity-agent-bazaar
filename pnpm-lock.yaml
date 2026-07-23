@@ -68,8 +68,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@unicitylabs/sphere-sdk':
-        specifier: ^0.10.7
-        version: 0.10.7(ws@8.21.0)
+        specifier: ^0.12.0
+        version: 0.12.0(ws@8.21.0)
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -120,8 +120,8 @@ importers:
         specifier: ^5.1.1
         version: 5.2.8
       '@unicitylabs/sphere-sdk':
-        specifier: ^0.10.7
-        version: 0.10.7(ws@8.21.0)
+        specifier: ^0.12.0
+        version: 0.12.0(ws@8.21.0)
       gsap:
         specifier: ^3.15.0
         version: 3.15.0
@@ -163,8 +163,8 @@ importers:
         specifier: ^1.12.0
         version: 1.29.0(zod@3.25.76)
       '@unicitylabs/sphere-sdk':
-        specifier: ^0.10.7
-        version: 0.10.7(ws@8.21.0)
+        specifier: ^0.12.0
+        version: 0.12.0(ws@8.21.0)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -961,12 +961,12 @@ packages:
     resolution: {integrity: sha512-4g3BLxfdTMy8iZG0MaBkadnlRrCJ74cQiFbyEVMrkwIoqdyaXXQM22cotDvrl4x28wgIZ9rEJRoM+mmhSJpJ1g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@unicitylabs/nostr-js-sdk@0.5.0':
-    resolution: {integrity: sha512-v6qaZBkyuZzvfjyO/x+czqftYdAqxjyfBXipsB0QJIdqePBiWHR2aRs28zzJIhCMk1vP9HXzxGnpjRqlcnzroA==}
+  '@unicitylabs/nostr-js-sdk@0.6.0':
+    resolution: {integrity: sha512-l6WcCmFok9nxI1WkYsjIVu67svouA2QyB5Vb+GTNugWrbw7hUgJMA1Elj8qu3u0qojvSINL/L9eWTmXVWRzZUw==}
     engines: {node: '>=18.0.0'}
 
-  '@unicitylabs/sphere-sdk@0.10.7':
-    resolution: {integrity: sha512-4ry1MUNWMHpawn11FrvvwpU8U94RxxW997syU92BSrUx8Cfx2c8S+VkGUnZJJht4694/tGQI1zagnaMdDTm+xA==}
+  '@unicitylabs/sphere-sdk@0.12.0':
+    resolution: {integrity: sha512-y3t64uac9cjKLmhgbVav5nCfz5iyovJ9YofSKeTr+Zl6dsp9rshsuJXPtMJELu1Sze8f8A7qvpu997QnD5q3Tw==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       ws: '>=8.0.0'
@@ -974,8 +974,8 @@ packages:
       ws:
         optional: true
 
-  '@unicitylabs/state-transition-sdk@2.0.0-rc.68bc1e5':
-    resolution: {integrity: sha512-JJ1jQFTexMBRwpn3pmhm4s2FulBcOBGyNZmQ4qd5ZheenbVLUkY5KSJ++J3Gnh/Vmhd6WVuCBw+FCyqXN39aHQ==}
+  '@unicitylabs/state-transition-sdk@2.0.1':
+    resolution: {integrity: sha512-O0pjxaL32VgHYjSM3Ei64UWBG2qwBzdQ9aIdlyhzTnPdI+kKu3h9saSMF1uV9XTfqKHsNGUpE/2dFUulNfmdmg==}
     engines: {node: '>=22'}
 
   '@vitejs/plugin-react@4.7.0':
@@ -1073,9 +1073,6 @@ packages:
   bip39@3.1.0:
     resolution: {integrity: sha512-c9kiwdk45Do5GL0vJMe7tS95VjCii65mYAH7DfWl3uW8AVzXKQVUm64i3hzVybBDMp9r7j9iNxR85+ul8MdN/A==}
 
-  bn.js@4.12.4:
-    resolution: {integrity: sha512-njR1b+ixG2ufvL9Zn9JGneW+b5GV6jqpYyPPpg4QVt723b5kJPGUczkUyWEH9BwEA74UakJZ43I4FDLBF7ci0g==}
-
   body-parser@2.3.0:
     resolution: {integrity: sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==}
     engines: {node: '>=18'}
@@ -1086,9 +1083,6 @@ packages:
   brace-expansion@5.0.7:
     resolution: {integrity: sha512-7oFy703dxfY3/NLxC1fh2SUCQ0H9rmAY+5EpDVfXjUTTs+HEwR2nYaqLv+GWcTsumwxPfiz6CzCNkwXwBUwqCA==}
     engines: {node: 18 || 20 || >=22}
-
-  brorand@1.1.0:
-    resolution: {integrity: sha512-cKV8tMCEpQs4hK/ik71d6LrPOnpkpGBR0wzxqr68g2m/LB2GxVYQroAjMJZRVM1Y4BCjCKc3vAamxSzOY2RP+w==}
 
   browserslist@4.28.4:
     resolution: {integrity: sha512-MTc8i/x9jBQd1iMw2CFGS+rwMa07eYjLR0CCTLDACl9xhxy+nIs3KeML/biicXtk9JrZ6dnnTatmc7ErPXIxqw==}
@@ -1222,9 +1216,6 @@ packages:
 
   electron-to-chromium@1.5.387:
     resolution: {integrity: sha512-TaxwufTFDufvPEoXdhwVrA3UdFWBeWGkYoJ1K8ldF1xe6gKfth6iRNS5lTQ5JPNOHdGQm8PT1QYKUqFLCiUefQ==}
-
-  elliptic@6.6.1:
-    resolution: {integrity: sha512-RaddvvMatK2LJHqFJ+YA4WysVN5Ita9E35botqIYspQ4TkRAlCicdzKOjlyv/1Za5RyTNn7di//eEV0uTAfe3g==}
 
   encodeurl@2.0.0:
     resolution: {integrity: sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg==}
@@ -1439,18 +1430,12 @@ packages:
     resolution: {integrity: sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==}
     engines: {node: '>= 0.4'}
 
-  hash.js@1.1.7:
-    resolution: {integrity: sha512-taOaskGt4z4SOANNseOviYDvjEJinIkRgmp7LbKP2YTTmVxWBl87s/uzK9r+44BclBSp2X7K1hqeNfz9JbBeXA==}
-
   hashlru@2.3.0:
     resolution: {integrity: sha512-0cMsjjIC8I+D3M44pOQdsy0OHXGLVz6Z0beRuufhKa0KfaD2wGwAev6jILzXsd3/vpnNQJmWyZtIILqM1N+n5A==}
 
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
-
-  hmac-drbg@1.0.1:
-    resolution: {integrity: sha512-Tti3gMqLdZfhOQY1Mzf/AanLiqh1WTiJgEj26ZuYQ9fbkLomzGchCws4FyrSd4VkpBfiNhaE1On+lOz894jvXg==}
 
   hono@4.12.28:
     resolution: {integrity: sha512-YwUvVpSF7m1yOblFPrU3Hbo8XhPheBoiyfGuII6z19LnOr6JpDnyyp7LFNrfV56wS8tpvtBFGRISHN02pDdLOA==}
@@ -1627,12 +1612,6 @@ packages:
   mime-types@3.0.2:
     resolution: {integrity: sha512-Lbgzdk0h4juoQ9fCKXW4by0UJqj+nOOrI9MJ1sSj4nI8aI2eo1qmvQEie4VD1glsS250n15LsWsYtCugiStS5A==}
     engines: {node: '>=18'}
-
-  minimalistic-assert@1.0.1:
-    resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}
-
-  minimalistic-crypto-utils@1.0.1:
-    resolution: {integrity: sha512-JIYlbt6g8i5jKfJ3xz7rF0LXmv2TkDxBLUkiBeZ7bAx4GnnNMr8xFpGnOxn6GhTEHx3SjRrZEoU+j04prX1ktg==}
 
   minimatch@10.2.5:
     resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
@@ -2907,7 +2886,7 @@ snapshots:
       '@typescript-eslint/types': 8.62.1
       eslint-visitor-keys: 5.0.1
 
-  '@unicitylabs/nostr-js-sdk@0.5.0':
+  '@unicitylabs/nostr-js-sdk@0.6.0':
     dependencies:
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
@@ -2915,18 +2894,17 @@ snapshots:
       '@scure/base': 1.2.6
       libphonenumber-js: 1.13.8
 
-  '@unicitylabs/sphere-sdk@0.10.7(ws@8.21.0)':
+  '@unicitylabs/sphere-sdk@0.12.0(ws@8.21.0)':
     dependencies:
       '@noble/ciphers': 2.2.0
       '@noble/curves': 2.2.0
       '@noble/hashes': 2.2.0
-      '@unicitylabs/nostr-js-sdk': 0.5.0
-      '@unicitylabs/state-transition-sdk': 2.0.0-rc.68bc1e5
+      '@unicitylabs/nostr-js-sdk': 0.6.0
+      '@unicitylabs/state-transition-sdk': 2.0.1
       bip39: 3.1.0
       buffer: 6.0.3
       canonicalize: 3.0.0
       crypto-js: 4.2.0
-      elliptic: 6.6.1
     optionalDependencies:
       '@libp2p/crypto': 5.1.20
       '@libp2p/peer-id': 6.0.11
@@ -2934,7 +2912,7 @@ snapshots:
       multiformats: 13.4.2
       ws: 8.21.0
 
-  '@unicitylabs/state-transition-sdk@2.0.0-rc.68bc1e5':
+  '@unicitylabs/state-transition-sdk@2.0.1':
     dependencies:
       '@noble/curves': 2.2.0
       '@noble/hashes': 2.2.0
@@ -3046,8 +3024,6 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
 
-  bn.js@4.12.4: {}
-
   body-parser@2.3.0:
     dependencies:
       bytes: 3.1.2
@@ -3070,8 +3046,6 @@ snapshots:
   brace-expansion@5.0.7:
     dependencies:
       balanced-match: 4.0.4
-
-  brorand@1.1.0: {}
 
   browserslist@4.28.4:
     dependencies:
@@ -3180,16 +3154,6 @@ snapshots:
   ee-first@1.1.1: {}
 
   electron-to-chromium@1.5.387: {}
-
-  elliptic@6.6.1:
-    dependencies:
-      bn.js: 4.12.4
-      brorand: 1.1.0
-      hash.js: 1.1.7
-      hmac-drbg: 1.0.1
-      inherits: 2.0.4
-      minimalistic-assert: 1.0.1
-      minimalistic-crypto-utils: 1.0.1
 
   encodeurl@2.0.0: {}
 
@@ -3474,23 +3438,12 @@ snapshots:
 
   has-symbols@1.1.0: {}
 
-  hash.js@1.1.7:
-    dependencies:
-      inherits: 2.0.4
-      minimalistic-assert: 1.0.1
-
   hashlru@2.3.0:
     optional: true
 
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
-
-  hmac-drbg@1.0.1:
-    dependencies:
-      hash.js: 1.1.7
-      minimalistic-assert: 1.0.1
-      minimalistic-crypto-utils: 1.0.1
 
   hono@4.12.28: {}
 
@@ -3643,10 +3596,6 @@ snapshots:
   mime-types@3.0.2:
     dependencies:
       mime-db: 1.54.0
-
-  minimalistic-assert@1.0.1: {}
-
-  minimalistic-crypto-utils@1.0.1: {}
 
   minimatch@10.2.5:
     dependencies:
