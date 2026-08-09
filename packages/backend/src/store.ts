@@ -20,6 +20,24 @@ export interface SnapshotStore<T> {
   close(): Promise<void>;
 }
 
+/** How long the first round-trip to Postgres may take before boot gives up. */
+const STORE_CONNECT_TIMEOUT_MS = 20_000;
+
+/** Reject with `message` if `p` has not settled within `ms`. */
+async function withDeadline<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${message} within ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 class FileStore<T> implements SnapshotStore<T> {
   readonly kind = 'file' as const;
   constructor(private readonly file: string) {}
@@ -43,7 +61,11 @@ class PgStore<T> implements SnapshotStore<T> {
     databaseUrl: string,
     private readonly logger?: Logger,
   ) {
-    this.pool = new pg.Pool({ connectionString: databaseUrl, max: 4 });
+    // A connect must never wait forever: pg defaults connectionTimeoutMillis to
+    // 0 (infinite), so a stalled database (a suspended free-tier instance, a
+    // black-holed route) would hang every query - and, at boot, the whole
+    // service - with no error to react to.
+    this.pool = new pg.Pool({ connectionString: databaseUrl, max: 4, connectionTimeoutMillis: 10_000 });
     // A dropped idle connection must not crash the process.
     this.pool.on('error', (err) => this.logger?.warn(`pg pool error: ${err.message}`));
     this.ready = this.init();
@@ -97,7 +119,13 @@ export async function createSnapshotStore<T>(opts: {
 }): Promise<SnapshotStore<T>> {
   if (opts.databaseUrl) {
     const store = new PgStore<T>(opts.databaseUrl, opts.logger);
-    await store.load(); // eager connect + ensure schema; throws if unreachable
+    // Eager connect + ensure schema; throws if unreachable. Bounded on top of
+    // the pool's connect timeout because a socket that connects but never
+    // answers would otherwise leave this query - and boot - pending forever.
+    // Failing loudly is deliberate: the supervisor restarts us and we retry,
+    // which is how a briefly-suspended database heals. Silently falling back to
+    // the local file would fork marketplace state away from the real snapshot.
+    await withDeadline(store.load(), STORE_CONNECT_TIMEOUT_MS, 'database did not respond');
     return store;
   }
   return new FileStore<T>(opts.file);

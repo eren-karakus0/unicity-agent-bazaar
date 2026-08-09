@@ -794,10 +794,25 @@ const server = http.createServer((req, res) => {
   json(res, 404, { error: 'not found' });
 });
 
+// The port opens before boot finishes, so a boot that never completes looks
+// perfectly healthy from the outside (systemd sees a live process, the proxy
+// sees an open port) while every API answers 503 forever. Both exits below are
+// therefore hard `process.exit`: setting `process.exitCode` alone would never
+// terminate us - the listening server keeps the event loop alive - so the
+// supervisor's restart policy would never fire and the outage would be silent.
+const BOOT_DEADLINE_MS = 120_000;
+
 server.listen(env.port, () => {
   log.info(`listening on :${env.port}`);
-  boot().catch((e) => {
-    log.error('boot failed', e instanceof Error ? e.message : e);
-    process.exitCode = 1;
-  });
+  const watchdog = setTimeout(() => {
+    log.error(`boot did not complete within ${BOOT_DEADLINE_MS}ms - exiting so the supervisor restarts us`);
+    process.exit(1);
+  }, BOOT_DEADLINE_MS);
+  boot()
+    .then(() => clearTimeout(watchdog))
+    .catch((e) => {
+      clearTimeout(watchdog);
+      log.error('boot failed', e instanceof Error ? e.message : e);
+      process.exit(1);
+    });
 });
