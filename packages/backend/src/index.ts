@@ -179,9 +179,9 @@ async function boot(): Promise<void> {
   // lands in history as a RECEIVED entry; sweep it and match by memo.
   const FUNDING_WINDOW_MS = 60 * 60_000;
   const { coinId: uctCoinId } = escrowAgent.uctCoin;
-  const sweepFunding = () => {
+  const sweepFunding = async () => {
     try {
-      const entries = escrowAgent.getHistory() as {
+      const entries = (await escrowAgent.getHistory()) as {
         id?: string;
         dedupKey?: string;
         type?: string;
@@ -207,8 +207,8 @@ async function boot(): Promise<void> {
       log.warn('funding sweep failed', e instanceof Error ? e.message : e);
     }
   };
-  sweepFunding();
-  setInterval(sweepFunding, 15_000);
+  void sweepFunding();
+  setInterval(() => void sweepFunding(), 15_000);
   setInterval(() => service?.sweepAutoRelease(), 20_000);
   // Periodically re-probe provider endpoints; auto-deactivate ones that go dark.
   setInterval(() => void service?.sweepListingHealth(), 60_000);

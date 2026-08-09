@@ -72,10 +72,11 @@ export class SphereAgent {
     // Normalize so the base providers can't drift onto a different network id.
     const network: NetworkType =
       this.opts.network === 'testnet' ? 'testnet2' : (this.opts.network ?? 'testnet2');
+    // No tokensDir: token custody is server-side on the wallet-api rail, so
+    // there is no local token store to point anywhere (SDK 0.14).
     const base = createNodeProviders({
       network,
       dataDir: this.opts.dataDir,
-      tokensDir: path.join(this.opts.dataDir, 'tokens'),
       oracle: { apiKey: this.opts.oracleApiKey },
     });
     const providers = createWalletApiProviders(base, {
@@ -157,11 +158,12 @@ export class SphereAgent {
   }
 
   // ---- payments ----
-  async mintUct(human: string | number) {
+  /** Mirrors the SDK's MintResult, which the package does not export by name. */
+  async mintUct(human: string | number): Promise<{ success: boolean; tokenId?: string; error?: string }> {
     const amount = parseTokenAmount(String(human), this.uctDecimals);
     const coinIdHex = getCoinIdBySymbol(UCT) ?? this.uctCoinId;
     this.log.info(`self-minting ${human} UCT (coinId ${coinIdHex.slice(0, 10)}…)…`);
-    return this.sphere.payments.mintFungibleToken(coinIdHex, amount);
+    return this.sphere.payments.mint(coinIdHex, amount);
   }
 
   async send(recipient: string, human: string | number, memo?: string) {
@@ -181,14 +183,18 @@ export class SphereAgent {
    * background (receive() callbacks never fire for them), but every delivery
    * lands here as a RECEIVED entry with sender pubkey/nametag + memo.
    */
-  getHistory(): unknown[] {
-    return this.sphere.payments.getHistory();
+  async getHistory(limit = 200): Promise<unknown[]> {
+    // History is paged (SDK 0.14) and the server picks the size when no limit
+    // is given. Ask for a generous page explicitly: callers sweep a recent time
+    // window on a busy wallet, and a small default page could hide arrivals.
+    const page = await this.sphere.payments.history({ limit });
+    return page.entries;
   }
 
   /** Confirmed (spendable) UCT balance, as a human-readable string. */
   async balanceUct(): Promise<string> {
     const uctHex = getCoinIdBySymbol(UCT);
-    const assets = await this.sphere.payments.getAssets();
+    const assets = await this.sphere.payments.assets();
     let total = 0n;
     for (const a of assets) {
       if (a.symbol === UCT || a.coinId === uctHex) {

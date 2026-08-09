@@ -1,4 +1,3 @@
-import path from 'node:path';
 import {
   Sphere,
   getCoinIdBySymbol,
@@ -32,10 +31,11 @@ export class McpWallet {
   constructor(private readonly cfg: WalletConfig) {}
 
   async start(): Promise<void> {
+    // No tokensDir: token custody is server-side on the wallet-api rail, so
+    // there is no local token store to point anywhere (SDK 0.14).
     const base = createNodeProviders({
       network: 'testnet2',
       dataDir: this.cfg.dataDir,
-      tokensDir: path.join(this.cfg.dataDir, 'tokens'),
       oracle: { apiKey: this.cfg.oracleApiKey },
     });
     const providers = createWalletApiProviders(base, {
@@ -86,7 +86,7 @@ export class McpWallet {
 
   async balanceUct(): Promise<string> {
     const uctHex = getCoinIdBySymbol(UCT);
-    const assets = await this.s.payments.getAssets();
+    const assets = await this.s.payments.assets();
     let total = 0n;
     for (const a of assets) {
       if (a.symbol === UCT || a.coinId === uctHex) {
