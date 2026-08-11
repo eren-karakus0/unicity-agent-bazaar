@@ -141,6 +141,42 @@ describe('AutonomousPatron', () => {
     expect(wallet.mintUct).not.toHaveBeenCalled();
   });
 
+  it('tops up when a hire fails for want of spendable tokens, though the balance reads healthy', async () => {
+    // Tokens held by an open transfer intent still count as confirmed, so the
+    // balance check sees a funded wallet while the payment leg has nothing free
+    // to spend - and never tops up, because by its own measure it is rich. That
+    // stalled the real patron indefinitely: it hired, could not pay, and no
+    // cycle ever recovered.
+    const wallet = walletStub(1000); // rich on paper
+    const { buyer } = buyerStub([listing('a', '@x')]);
+    (buyer.hireAndSettle as ReturnType<typeof vi.fn>).mockRejectedValue(
+      Object.assign(new Error('Insufficient spendable balance: need 2, 0 free, 500 pinned by 3 transfer(s)'), {
+        code: 'SEND_INSUFFICIENT_BALANCE',
+      }),
+    );
+    const patron = new AutonomousPatron(baseOpts(wallet, buyer));
+    await patron.bootstrap();
+
+    await patron.runCycle();
+    expect(wallet.mintUct).toHaveBeenCalledOnce();
+
+    // ...but only once across a run of failures - a mint per cycle would mint
+    // without bound while nothing is ever paid.
+    await patron.runCycle();
+    await patron.runCycle();
+    expect(wallet.mintUct).toHaveBeenCalledOnce();
+  });
+
+  it('reports a mint that failed in its payload instead of assuming it worked', async () => {
+    const wallet = walletStub(5); // below the floor, so it tops up
+    (wallet.mintUct as ReturnType<typeof vi.fn>).mockResolvedValue({ success: false, error: 'gateway refused' });
+    const { buyer } = buyerStub([listing('a', '@x')]);
+    const patron = new AutonomousPatron(baseOpts(wallet, buyer));
+    await patron.bootstrap();
+    await expect(patron.runCycle()).resolves.toBeUndefined();
+    expect(wallet.mintUct).toHaveBeenCalledOnce();
+  });
+
   it('records a failed cycle without throwing', async () => {
     const { buyer } = buyerStub([listing('a', '@x')]);
     (buyer.hireAndSettle as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('escrow timed out'));

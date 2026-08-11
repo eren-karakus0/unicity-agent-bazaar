@@ -26,6 +26,22 @@ import { principalOf, normalizeNametag } from './auth.js';
 import { createLogger, type Logger } from './logger.js';
 import type { NetworkType } from './config.js';
 
+/** Least time between float top-ups, so a run of failing cycles mints once. */
+const MINT_COOLDOWN_MS = 5 * 60_000;
+
+/**
+ * Coin selection refused the spend for want of unreserved tokens. Matched on
+ * the SDK's error code, with the message as a fallback so a wallet that only
+ * carries the text is still recognised.
+ */
+function isInsufficientBalance(e: unknown): boolean {
+  const err = e as { code?: unknown; message?: unknown } | null;
+  return (
+    err?.code === 'SEND_INSUFFICIENT_BALANCE' ||
+    (typeof err?.message === 'string' && /insufficient (spendable )?balance/i.test(err.message))
+  );
+}
+
 /** The wallet surface the patron needs (satisfied by SphereAgent). */
 export interface PatronWallet {
   start(): Promise<unknown>;
@@ -88,6 +104,8 @@ export class AutonomousPatron {
   private client: PatronBuyer | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
+  /** When the patron last minted a float top-up (see MINT_COOLDOWN_MS). */
+  private lastMintAt = 0;
   private cursor = 0;
   private principal_: string | null = null;
 
@@ -213,6 +231,15 @@ export class AutonomousPatron {
     } catch (e) {
       this.lastError = errMsg(e);
       this.log.warn(`patron cycle failed: ${this.lastError}`);
+      // A reported balance is not a spendable one: tokens held by an open
+      // transfer intent still count as confirmed, so ensureFunds() can see a
+      // funded wallet while the payment leg has nothing free to spend - and
+      // then never tops up, because by its own measure it is rich. This is
+      // what stalled the patron indefinitely. Mint a fresh float (new tokens
+      // are unreserved by construction) for the NEXT cycle; a just-minted
+      // token is not spendable the instant the mint resolves, so retrying
+      // this hire inline would fail again and mint again every cycle.
+      if (isInsufficientBalance(e)) await this.topUpFloat();
     } finally {
       this.busy = false;
     }
@@ -225,12 +252,35 @@ export class AutonomousPatron {
       const balance = Number(await this.agent.balanceUct());
       const floor = this.opts.minBalanceUct ?? 25;
       if (balance < floor) {
-        const mint = this.opts.mintUct ?? 100;
-        this.log.info(`patron balance ${balance} UCT - minting ${mint}`);
-        await this.agent.mintUct(mint);
+        this.log.info(`patron balance ${balance} UCT - topping up`);
+        await this.topUpFloat();
       }
     } catch (e) {
       this.log.warn(`patron balance check failed: ${errMsg(e)}`);
+    }
+  }
+
+  /**
+   * Mint a spendable float. Rate-limited so a run of failing cycles cannot mint
+   * once per cycle, and the result is checked: a mint reports failure in its
+   * payload rather than throwing, so ignoring it would leave the patron quietly
+   * unable to pay while believing it had just funded itself.
+   */
+  private async topUpFloat(): Promise<void> {
+    if (!this.agent) return;
+    const now = Date.now();
+    if (now - this.lastMintAt < MINT_COOLDOWN_MS) return;
+    this.lastMintAt = now;
+    const mint = this.opts.mintUct ?? 100;
+    try {
+      const res = (await this.agent.mintUct(mint)) as { success?: boolean; error?: string } | undefined;
+      if (res?.success === false) {
+        this.log.warn(`patron float top-up of ${mint} UCT failed: ${res.error ?? 'unknown error'}`);
+      } else {
+        this.log.info(`patron minted ${mint} UCT of float`);
+      }
+    } catch (e) {
+      this.log.warn(`patron float top-up failed: ${errMsg(e)}`);
     }
   }
 
